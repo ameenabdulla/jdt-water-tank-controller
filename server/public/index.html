@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JDT Water Tank Controller</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="header-left">
+      <div class="logo-icon-wrap">
+        <i data-lucide="droplets"></i>
+      </div>
+      <div>
+        <h1>JDT Water Tank</h1>
+        <p class="header-sub">Islam Institute • IoT Controller</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div id="connection-badge" class="badge offline">
+        <span class="pulse-dot"></span>
+        <span id="badge-text">ESP32 OFFLINE</span>
+      </div>
+      <button class="settings-btn" id="settings-btn" title="Settings">
+        <i data-lucide="settings"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Dashboard -->
+  <main>
+    <!-- Left Column: Tank Visualization -->
+    <section class="tank-section">
+      <div class="tank-wrapper">
+        <!-- Tank Body -->
+        <div class="tank">
+          <div class="tank-glass">
+            <!-- Water Fill -->
+            <div id="water-fill" class="water-fill" style="height: 0%;">
+              <div class="wave wave1"></div>
+              <div class="wave wave2"></div>
+              <div class="wave wave3"></div>
+            </div>
+            <!-- Level Marks -->
+            <div class="level-marks">
+              <span class="mark" style="bottom: 100%;">100%</span>
+              <span class="mark" style="bottom: 75%;">75%</span>
+              <span class="mark" style="bottom: 50%;">50%</span>
+              <span class="mark" style="bottom: 25%;">25%</span>
+              <span class="mark" style="bottom: 0%;">0%</span>
+            </div>
+          </div>
+          <!-- Tank Top -->
+          <div class="tank-top">
+            <i data-lucide="radio" class="sensor-icon" title="Ultrasonic Sensor"></i>
+          </div>
+          <!-- Tank Base -->
+          <div class="tank-base"></div>
+        </div>
+
+        <!-- Live Readings -->
+        <div class="live-readings">
+          <div class="reading-card big">
+            <span class="reading-label">Water Level</span>
+            <span class="reading-value" id="level-percent">0<small>%</small></span>
+          </div>
+          <div class="reading-card">
+            <span class="reading-label">Distance</span>
+            <span class="reading-value" id="distance-cm">0 <small>cm</small></span>
+          </div>
+          <div class="reading-card">
+            <span class="reading-label">Tank Depth</span>
+            <span class="reading-value" id="tank-depth-display">100 <small>cm</small></span>
+          </div>
+          <div class="reading-card">
+            <span class="reading-label">WiFi Signal</span>
+            <span class="reading-value" id="rssi-val">-- <small>dBm</small></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: Controls & Graph -->
+    <section class="info-section">
+      <!-- Pump Control Card -->
+      <div class="card pump-card">
+        <div class="card-header">
+          <div class="card-icon-wrap pump-icon-wrap">
+            <i data-lucide="zap"></i>
+          </div>
+          <div>
+            <h2>Pump Control</h2>
+            <p class="card-sub" id="pump-status-text">Mode: AUTO</p>
+          </div>
+        </div>
+        <div class="pump-controls">
+          <div class="mode-toggle">
+            <button class="mode-btn active" id="auto-btn">AUTO</button>
+            <button class="mode-btn" id="manual-btn">MANUAL</button>
+          </div>
+          <div class="pump-switch-row">
+            <span class="pump-label">Motor Pump</span>
+            <div class="pump-state" id="pump-state-indicator">
+              <span id="pump-state-text">OFF</span>
+            </div>
+            <label class="switch" id="pump-switch-label">
+              <input type="checkbox" id="pump-toggle" disabled>
+              <span class="slider round"></span>
+            </label>
+          </div>
+          <p class="pump-hint" id="pump-hint">Pump is controlled automatically based on thresholds.</p>
+        </div>
+      </div>
+
+      <!-- Graph Card -->
+      <div class="card graph-card">
+        <div class="card-header">
+          <div class="card-icon-wrap graph-icon-wrap">
+            <i data-lucide="trending-up"></i>
+          </div>
+          <div>
+            <h2>Level History</h2>
+            <p class="card-sub">Real-time water level graph</p>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="levelChart"></canvas>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2><i data-lucide="settings"></i> Tank Settings</h2>
+        <button class="modal-close" id="modal-close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-group">
+          <label>Tank Depth (cm)</label>
+          <p class="setting-desc">Total depth of your water tank. Empty the tank completely, then use the sensor reading below as reference.</p>
+          <div class="input-row">
+            <input type="number" id="input-depth" class="setting-input" value="100" min="10" max="500" step="1">
+            <span class="input-unit">cm</span>
+          </div>
+          <div class="calibrate-hint">
+            <i data-lucide="info"></i>
+            <span>Current sensor reading: <strong id="calibrate-distance">-- cm</strong></span>
+          </div>
+        </div>
+        <div class="setting-group">
+          <label>Sensor Offset (cm)</label>
+          <p class="setting-desc">Distance from sensor face to the maximum water surface when tank is 100% full.</p>
+          <div class="input-row">
+            <input type="number" id="input-offset" class="setting-input" value="5" min="0" max="50" step="1">
+            <span class="input-unit">cm</span>
+          </div>
+        </div>
+        <div class="setting-group">
+          <label>Low Level Threshold (%)</label>
+          <p class="setting-desc">In AUTO mode, pump turns ON when level drops below this.</p>
+          <div class="slider-row">
+            <input type="range" id="input-low" class="range-slider" min="5" max="50" value="20">
+            <span class="range-val" id="low-val">20%</span>
+          </div>
+        </div>
+        <div class="setting-group">
+          <label>High Level Threshold (%)</label>
+          <p class="setting-desc">In AUTO mode, pump turns OFF when level rises above this.</p>
+          <div class="slider-row">
+            <input type="range" id="input-high" class="range-slider" min="50" max="100" value="90">
+            <span class="range-val" id="high-val">90%</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-save" id="btn-save-settings">
+          <i data-lucide="save"></i> Save Settings
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>
