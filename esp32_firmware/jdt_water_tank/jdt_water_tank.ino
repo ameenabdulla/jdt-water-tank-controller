@@ -21,11 +21,10 @@
 // ======================== CONFIGURATION ========================
 // 1. WiFi Settings
 const char* ssid     = "Airtel_juma_8616";
-const char* password = "38725";
+const char* password = "air38725";
 
 // 2. Server URL (Render cloud deployment)
-// Replace with your actual Render URL once deployed!
-const char* serverUrl = "https://YOUR-RENDER-URL.onrender.com/api/device";
+const char* serverUrl = "https://jdt-water-tank-controller.onrender.com/api/device";
 
 // 3. Ultrasonic Sensor Pins
 const int TRIG_PIN = 12;

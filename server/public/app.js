@@ -5,6 +5,13 @@ const WS_URL = `${protocol}//${host}`;
 const API_URL = `${window.location.protocol}//${host}`;
 
 // ── UI Elements ─────────────────────────────────────────────────────────
+const loginOverlay = document.getElementById('login-overlay');
+const loginForm = document.getElementById('login-form');
+const usernameInput = document.getElementById('username');
+const passwordInput = document.getElementById('password');
+const loginError = document.getElementById('login-error');
+const appContainer = document.getElementById('app-container');
+
 const connectionBadge = document.getElementById('connection-badge');
 const badgeText = document.getElementById('badge-text');
 const waterFill = document.getElementById('water-fill');
@@ -16,12 +23,12 @@ const pumpToggle = document.getElementById('pump-toggle');
 const pumpStateIndicator = document.getElementById('pump-state-indicator');
 const pumpStateText = document.getElementById('pump-state-text');
 const pumpStatusText = document.getElementById('pump-status-text');
-const pumpHint = document.getElementById('pump-hint');
 const autoBtn = document.getElementById('auto-btn');
 const manualBtn = document.getElementById('manual-btn');
 const settingsBtn = document.getElementById('settings-btn');
 const modalOverlay = document.getElementById('modal-overlay');
 const modalClose = document.getElementById('modal-close');
+
 const inputDepth = document.getElementById('input-depth');
 const inputOffset = document.getElementById('input-offset');
 const inputLow = document.getElementById('input-low');
@@ -29,183 +36,59 @@ const inputHigh = document.getElementById('input-high');
 const lowVal = document.getElementById('low-val');
 const highVal = document.getElementById('high-val');
 const calibrateDistance = document.getElementById('calibrate-distance');
+const currentPass = document.getElementById('current-pass');
+const newPass = document.getElementById('new-pass');
+const confirmPass = document.getElementById('confirm-pass');
+const passError = document.getElementById('pass-error');
 const btnSave = document.getElementById('btn-save-settings');
 
-// ── State ───────────────────────────────────────────────────────────────
+// ── State variables ─────────────────────────────────────────────────────
 let socket = null;
 let currentState = { levelPercent: 0, distanceCm: 0, pumpOn: false, mode: 'AUTO', online: false, rssi: 0 };
 let currentConfig = { tankDepthCm: 100, sensorOffsetCm: 5, lowThreshold: 20, highThreshold: 90 };
-let levelChart = null;
 
-// ── Chart.js Setup ──────────────────────────────────────────────────────
-function initChart() {
-  const ctx = document.getElementById('levelChart').getContext('2d');
+// ── Authentication Check on Load ────────────────────────────────────────
+function checkAuth() {
+  const authStatus = sessionStorage.getItem('jdt_auth');
+  if (authStatus === 'true') {
+    loginOverlay.style.display = 'none';
+    appContainer.style.display = 'flex';
+    connectWebSocket();
+  } else {
+    loginOverlay.style.display = 'flex';
+    appContainer.style.display = 'none';
+  }
+}
 
-  const gradient = ctx.createLinearGradient(0, 0, 0, 220);
-  gradient.addColorStop(0, 'rgba(14, 165, 233, 0.25)');
-  gradient.addColorStop(1, 'rgba(14, 165, 233, 0.0)');
+// Handle Login Submission
+loginForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  loginError.style.display = 'none';
 
-  levelChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [{
-        label: 'Water Level %',
-        data: [],
-        borderColor: '#0ea5e9',
-        backgroundColor: gradient,
-        borderWidth: 2,
-        fill: true,
-        tension: 0.4,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        pointHoverBackgroundColor: '#22d3ee',
-        pointHoverBorderColor: '#fff'
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: '#111',
-          borderColor: '#222',
-          borderWidth: 1,
-          titleColor: '#888',
-          bodyColor: '#0ea5e9',
-          bodyFont: { family: "'JetBrains Mono', monospace", weight: 'bold' },
-          padding: 10,
-          cornerRadius: 8,
-          callbacks: {
-            label: (ctx) => ` ${ctx.parsed.y.toFixed(1)}%`
-          }
-        }
-      },
-      scales: {
-        x: {
-          display: true,
-          grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false },
-          ticks: { color: '#333', font: { size: 9, family: "'JetBrains Mono'" }, maxTicksLimit: 8 }
-        },
-        y: {
-          display: true,
-          min: 0, max: 100,
-          grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false },
-          ticks: {
-            color: '#333',
-            font: { size: 9, family: "'JetBrains Mono'" },
-            callback: (v) => v + '%',
-            stepSize: 25
-          }
-        }
-      }
+  const username = usernameInput.value;
+  const password = passwordInput.value;
+
+  try {
+    const res = await fetch(`${API_URL}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      sessionStorage.setItem('jdt_auth', 'true');
+      loginOverlay.style.display = 'none';
+      appContainer.style.display = 'flex';
+      connectWebSocket();
+    } else {
+      loginError.style.display = 'block';
     }
-  });
-}
-
-function addChartPoint(level, timestamp) {
-  const date = new Date(timestamp);
-  const timeLabel = date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-  levelChart.data.labels.push(timeLabel);
-  levelChart.data.datasets[0].data.push(level);
-
-  // Keep only last 50 points visible
-  if (levelChart.data.labels.length > 50) {
-    levelChart.data.labels.shift();
-    levelChart.data.datasets[0].data.shift();
+  } catch (err) {
+    loginError.textContent = 'Server connection failed.';
+    loginError.style.display = 'block';
   }
-
-  levelChart.update('none'); // 'none' for no animation (smooth performance)
-}
-
-function loadHistory(historyData) {
-  if (!historyData || historyData.length === 0) return;
-
-  const labels = [];
-  const values = [];
-
-  historyData.forEach(point => {
-    const date = new Date(point.time);
-    labels.push(date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-    values.push(point.level);
-  });
-
-  // Keep last 50
-  const sliceStart = Math.max(0, labels.length - 50);
-  levelChart.data.labels = labels.slice(sliceStart);
-  levelChart.data.datasets[0].data = values.slice(sliceStart);
-  levelChart.update('none');
-}
-
-// ── UI Update Functions ─────────────────────────────────────────────────
-function updateTankUI(state) {
-  // Water fill animation
-  waterFill.style.height = state.levelPercent + '%';
-
-  // Change water color based on level
-  if (state.levelPercent < 20) {
-    waterFill.style.background = 'linear-gradient(180deg, rgba(239,68,68,0.6) 0%, rgba(180,40,40,0.4) 100%)';
-  } else if (state.levelPercent < 50) {
-    waterFill.style.background = 'linear-gradient(180deg, rgba(245,158,11,0.6) 0%, rgba(180,100,10,0.4) 100%)';
-  } else {
-    waterFill.style.background = 'linear-gradient(180deg, rgba(14,165,233,0.6) 0%, rgba(14,165,233,0.35) 40%, rgba(6,95,140,0.5) 100%)';
-  }
-
-  // Live numbers
-  levelPercent.innerHTML = state.levelPercent.toFixed(1) + '<small>%</small>';
-  distanceCm.innerHTML = state.distanceCm.toFixed(1) + ' <small>cm</small>';
-  rssiVal.innerHTML = state.rssi + ' <small>dBm</small>';
-
-  // Add chart point
-  addChartPoint(state.levelPercent, Date.now());
-
-  // Update calibration distance in settings modal
-  calibrateDistance.textContent = state.distanceCm.toFixed(1) + ' cm';
-}
-
-function updatePumpUI(state) {
-  pumpToggle.checked = state.pumpOn;
-  pumpStateText.textContent = state.pumpOn ? 'ON' : 'OFF';
-  pumpStateIndicator.className = 'pump-state ' + (state.pumpOn ? 'on' : 'off');
-
-  // Mode UI
-  if (state.mode === 'AUTO') {
-    autoBtn.classList.add('active');
-    manualBtn.classList.remove('active');
-    pumpToggle.disabled = true;
-    pumpStatusText.textContent = 'Mode: AUTO';
-    pumpHint.textContent = 'Pump is controlled automatically based on thresholds.';
-  } else {
-    autoBtn.classList.remove('active');
-    manualBtn.classList.add('active');
-    pumpToggle.disabled = false;
-    pumpStatusText.textContent = 'Mode: MANUAL';
-    pumpHint.textContent = 'You have full manual control over the pump.';
-  }
-}
-
-function updateDeviceStatus(online) {
-  if (online) {
-    connectionBadge.className = 'badge online';
-    badgeText.textContent = 'ESP32 ONLINE';
-  } else {
-    connectionBadge.className = 'badge offline';
-    badgeText.textContent = 'ESP32 OFFLINE';
-  }
-}
-
-function updateConfigUI(config) {
-  tankDepthDisplay.innerHTML = config.tankDepthCm + ' <small>cm</small>';
-  inputDepth.value = config.tankDepthCm;
-  inputOffset.value = config.sensorOffsetCm;
-  inputLow.value = config.lowThreshold;
-  inputHigh.value = config.highThreshold;
-  lowVal.textContent = config.lowThreshold + '%';
-  highVal.textContent = config.highThreshold + '%';
-}
+});
 
 // ── WebSocket ───────────────────────────────────────────────────────────
 function connectWebSocket() {
@@ -230,10 +113,6 @@ function connectWebSocket() {
         currentConfig = data;
         updateConfigUI(data);
       }
-
-      if (data.type === 'history') {
-        loadHistory(data.history);
-      }
     } catch (err) {
       console.error('WS parse error:', err);
     }
@@ -248,9 +127,66 @@ function connectWebSocket() {
   socket.onerror = () => {};
 }
 
-// ── Controls Events ─────────────────────────────────────────────────────
+// ── UI Updates ──────────────────────────────────────────────────────────
+function updateTankUI(state) {
+  // Water fill height
+  waterFill.style.height = state.levelPercent + '%';
 
-// Mode buttons
+  // Dynamic colors based on water level
+  if (state.levelPercent < 20) {
+    waterFill.style.background = 'linear-gradient(180deg, rgba(239,68,68,0.7) 0%, rgba(180,40,40,0.5) 100%)';
+  } else if (state.levelPercent < 50) {
+    waterFill.style.background = 'linear-gradient(180deg, rgba(245,158,11,0.7) 0%, rgba(180,100,10,0.5) 100%)';
+  } else {
+    waterFill.style.background = 'linear-gradient(180deg, rgba(14,165,233,0.7) 0%, rgba(14,165,233,0.4) 40%, rgba(3,105,161,0.5) 100%)';
+  }
+
+  // Value readouts
+  levelPercent.innerHTML = state.levelPercent.toFixed(1) + '<small>%</small>';
+  distanceCm.innerHTML = state.distanceCm.toFixed(1) + ' <small>cm</small>';
+  rssiVal.innerHTML = state.rssi + ' <small>dBm</small>';
+  calibrateDistance.textContent = state.distanceCm.toFixed(1) + ' cm';
+}
+
+function updatePumpUI(state) {
+  pumpToggle.checked = state.pumpOn;
+  pumpStateText.textContent = state.pumpOn ? 'ON' : 'OFF';
+  pumpStateIndicator.className = 'pump-state-badge ' + (state.pumpOn ? 'on' : 'off');
+
+  if (state.mode === 'AUTO') {
+    autoBtn.classList.add('active');
+    manualBtn.classList.remove('active');
+    pumpToggle.disabled = true;
+    pumpStatusText.textContent = 'Mode: AUTO';
+  } else {
+    autoBtn.classList.remove('active');
+    manualBtn.classList.add('active');
+    pumpToggle.disabled = false;
+    pumpStatusText.textContent = 'Mode: MANUAL';
+  }
+}
+
+function updateDeviceStatus(online) {
+  if (online) {
+    connectionBadge.className = 'badge online';
+    badgeText.textContent = 'ESP32 ONLINE';
+  } else {
+    connectionBadge.className = 'badge offline';
+    badgeText.textContent = 'ESP32 OFFLINE';
+  }
+}
+
+function updateConfigUI(config) {
+  tankDepthDisplay.innerHTML = config.tankDepthCm + ' <small>cm</small>';
+  inputDepth.value = config.tankDepthCm;
+  inputOffset.value = config.sensorOffsetCm;
+  inputLow.value = config.lowThreshold;
+  inputHigh.value = config.highThreshold;
+  lowVal.textContent = config.lowThreshold + '%';
+  highVal.textContent = config.highThreshold + '%';
+}
+
+// ── Manual controls ─────────────────────────────────────────────────────
 autoBtn.addEventListener('click', () => {
   if (!socket || socket.readyState !== WebSocket.OPEN) return;
   socket.send(JSON.stringify({ type: 'control', mode: 'AUTO' }));
@@ -265,7 +201,6 @@ manualBtn.addEventListener('click', () => {
   updatePumpUI(currentState);
 });
 
-// Pump toggle (manual mode only)
 pumpToggle.addEventListener('change', () => {
   if (!socket || socket.readyState !== WebSocket.OPEN) return;
   socket.send(JSON.stringify({ type: 'control', pumpOn: pumpToggle.checked }));
@@ -273,27 +208,57 @@ pumpToggle.addEventListener('change', () => {
   updatePumpUI(currentState);
 });
 
-// ── Settings Modal ──────────────────────────────────────────────────────
+// ── Settings modal ──────────────────────────────────────────────────────
 settingsBtn.addEventListener('click', () => {
+  currentPass.value = '';
+  newPass.value = '';
+  confirmPass.value = '';
+  passError.style.display = 'none';
   modalOverlay.classList.add('show');
 });
 
-modalClose.addEventListener('click', () => {
-  modalOverlay.classList.remove('show');
-});
+modalClose.addEventListener('click', () => { modalOverlay.classList.remove('show'); });
+modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.classList.remove('show'); });
 
-modalOverlay.addEventListener('click', (e) => {
-  if (e.target === modalOverlay) modalOverlay.classList.remove('show');
-});
-
-// Sliders live update
 inputLow.addEventListener('input', () => { lowVal.textContent = inputLow.value + '%'; });
 inputHigh.addEventListener('input', () => { highVal.textContent = inputHigh.value + '%'; });
 
-// Save settings
-btnSave.addEventListener('click', () => {
+// Save configurations & settings
+btnSave.addEventListener('click', async () => {
   if (!socket || socket.readyState !== WebSocket.OPEN) return;
+  passError.style.display = 'none';
 
+  // 1. Handle Password Change (Optional)
+  if (newPass.value !== '') {
+    if (newPass.value !== confirmPass.value) {
+      passError.textContent = 'Passwords do not match.';
+      passError.style.display = 'block';
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword: currentPass.value,
+          newPassword: newPass.value
+        })
+      });
+      const data = await res.json();
+      if (!data.success) {
+        passError.textContent = data.error || 'Password update failed.';
+        passError.style.display = 'block';
+        return;
+      }
+    } catch (err) {
+      passError.textContent = 'Connection error updating password.';
+      passError.style.display = 'block';
+      return;
+    }
+  }
+
+  // 2. Handle configuration updates over WS
   const newConfig = {
     type: 'config',
     tankDepthCm: parseFloat(inputDepth.value),
@@ -303,22 +268,18 @@ btnSave.addEventListener('click', () => {
   };
 
   socket.send(JSON.stringify(newConfig));
-
-  // Update local display
   currentConfig = { ...currentConfig, ...newConfig };
   updateConfigUI(currentConfig);
 
-  // Close modal
   modalOverlay.classList.remove('show');
 
   // Button feedback animation
-  btnSave.textContent = '✓ Saved!';
+  btnSave.textContent = '✓ Saved Successfully!';
   setTimeout(() => {
-    btnSave.innerHTML = '<i data-lucide="save"></i> Save Settings';
+    btnSave.innerHTML = '<i data-lucide="save"></i> Save Settings & Password';
     lucide.createIcons();
   }, 1500);
 });
 
-// ── Init ────────────────────────────────────────────────────────────────
-initChart();
-connectWebSocket();
+// Run auth check on initialization
+checkAuth();

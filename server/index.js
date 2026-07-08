@@ -14,28 +14,34 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ── Authentication Config (Stored in memory, can be changed via API) ───
+let authConfig = {
+  username: 'admin',
+  password: 'admin@123'
+};
+
 // ── Tank State ──────────────────────────────────────────────────────────
 let tankState = {
-  distanceCm: 0,         // raw ultrasonic distance in cm
-  levelPercent: 0,        // calculated water level percentage
-  pumpOn: false,          // is the pump relay active?
-  mode: 'AUTO',           // 'AUTO' or 'MANUAL'
+  distanceCm: 0,
+  levelPercent: 0,
+  pumpOn: false,
+  mode: 'AUTO',
   online: false,
   lastSeen: null,
-  rssi: 0                 // WiFi signal strength
+  rssi: 0
 };
 
 // ── Tank Configuration ──────────────────────────────────────────────────
 let tankConfig = {
-  tankDepthCm: 100,       // total tank depth in cm (calibrated)
-  lowThreshold: 20,       // % below which pump turns ON in AUTO mode
-  highThreshold: 90,      // % above which pump turns OFF in AUTO mode
-  sensorOffsetCm: 5       // distance from sensor to max water level
+  tankDepthCm: 100,
+  lowThreshold: 20,
+  highThreshold: 90,
+  sensorOffsetCm: 5
 };
 
-// ── History for Graph (last 100 readings) ───────────────────────────────
+// ── History for Graph ───────────────────────────────────────────────────
 let history = [];
-const MAX_HISTORY = 200;
+const MAX_HISTORY = 50;
 
 function isDeviceOnline() {
   if (!tankState.lastSeen) return false;
@@ -80,19 +86,27 @@ function broadcastConfig() {
   });
 }
 
-function broadcastHistory() {
-  const data = JSON.stringify({
-    type: 'history',
-    history: history
-  });
-  wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(data);
-    }
-  });
-}
-
 // ── REST API ────────────────────────────────────────────────────────────
+
+// Login Endpoint
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  if (username === authConfig.username && password === authConfig.password) {
+    return res.json({ success: true, token: 'authenticated-session-token-jdt' });
+  }
+  return res.status(401).json({ success: false, error: 'Incorrect Username or Password' });
+});
+
+// Change Password Endpoint
+app.post('/api/change-password', (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (currentPassword === authConfig.password) {
+    authConfig.password = newPassword;
+    console.log('[AUTH] Password changed successfully');
+    return res.json({ success: true });
+  }
+  return res.status(400).json({ success: false, error: 'Incorrect current password' });
+});
 
 app.get('/api/status', (req, res) => {
   res.json({
@@ -114,23 +128,15 @@ app.post('/api/device', (req, res) => {
     tankState.rssi = req.body.rssi;
   }
 
-  // Store history point
-  history.push({
-    time: Date.now(),
-    level: tankState.levelPercent,
-    distance: tankState.distanceCm
-  });
-  if (history.length > MAX_HISTORY) history.shift();
-
   // AUTO mode logic
   if (tankState.mode === 'AUTO') {
     if (tankState.levelPercent <= tankConfig.lowThreshold && !tankState.pumpOn) {
       tankState.pumpOn = true;
-      console.log('[AUTO] Pump turned ON (level below low threshold)');
+      console.log('[AUTO] Pump turned ON');
     }
     if (tankState.levelPercent >= tankConfig.highThreshold && tankState.pumpOn) {
       tankState.pumpOn = false;
-      console.log('[AUTO] Pump turned OFF (level above high threshold)');
+      console.log('[AUTO] Pump turned OFF');
     }
   }
 
@@ -150,12 +156,10 @@ app.post('/api/config', (req, res) => {
   if (req.body.highThreshold !== undefined) tankConfig.highThreshold = parseFloat(req.body.highThreshold);
   if (req.body.sensorOffsetCm !== undefined) tankConfig.sensorOffsetCm = parseFloat(req.body.sensorOffsetCm);
   
-  // Recalculate level with new config
   tankState.levelPercent = calculateLevel(tankState.distanceCm);
   
   broadcastConfig();
   broadcastState();
-  console.log('[CONFIG] Updated:', tankConfig);
   res.json({ success: true, config: tankConfig });
 });
 
@@ -164,7 +168,6 @@ app.post('/api/config', (req, res) => {
 wss.on('connection', (ws) => {
   console.log('[WS] New client connected');
 
-  // Send current state, config, and history
   ws.send(JSON.stringify({
     type: 'state',
     distanceCm: tankState.distanceCm,
@@ -181,29 +184,20 @@ wss.on('connection', (ws) => {
     ...tankConfig
   }));
 
-  ws.send(JSON.stringify({
-    type: 'history',
-    history: history
-  }));
-
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message);
 
-      // Dashboard control commands
       if (data.type === 'control') {
         if (data.mode !== undefined) {
           tankState.mode = data.mode;
-          console.log(`[WS] Mode changed to: ${tankState.mode}`);
         }
         if (data.pumpOn !== undefined && tankState.mode === 'MANUAL') {
           tankState.pumpOn = data.pumpOn;
-          console.log(`[WS] Manual pump control: ${tankState.pumpOn}`);
         }
         broadcastState(ws);
       }
 
-      // Config updates from dashboard
       if (data.type === 'config') {
         if (data.tankDepthCm !== undefined) tankConfig.tankDepthCm = parseFloat(data.tankDepthCm);
         if (data.lowThreshold !== undefined) tankConfig.lowThreshold = parseFloat(data.lowThreshold);
@@ -212,7 +206,6 @@ wss.on('connection', (ws) => {
         tankState.levelPercent = calculateLevel(tankState.distanceCm);
         broadcastConfig();
         broadcastState();
-        console.log('[WS] Config updated:', tankConfig);
       }
 
       // ESP32 telemetry via WebSocket
@@ -224,14 +217,6 @@ wss.on('connection', (ws) => {
         }
         if (data.rssi !== undefined) tankState.rssi = data.rssi;
 
-        history.push({
-          time: Date.now(),
-          level: tankState.levelPercent,
-          distance: tankState.distanceCm
-        });
-        if (history.length > MAX_HISTORY) history.shift();
-
-        // AUTO mode logic
         if (tankState.mode === 'AUTO') {
           if (tankState.levelPercent <= tankConfig.lowThreshold && !tankState.pumpOn) {
             tankState.pumpOn = true;
@@ -242,11 +227,9 @@ wss.on('connection', (ws) => {
         }
 
         broadcastState(ws);
-        // Reply with pump command
         ws.send(JSON.stringify({ type: 'command', pumpOn: tankState.pumpOn }));
       }
 
-      // Ping/heartbeat from ESP32
       if (data.type === 'ping') {
         tankState.lastSeen = Date.now();
         ws.send(JSON.stringify({ type: 'pong', pumpOn: tankState.pumpOn }));
@@ -259,12 +242,10 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
-    console.log('[WS] Client disconnected');
     broadcastState();
   });
 });
 
-// Periodic broadcast
 setInterval(() => { broadcastState(); }, 5000);
 
 server.listen(PORT, () => {
