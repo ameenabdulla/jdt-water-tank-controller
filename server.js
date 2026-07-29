@@ -45,12 +45,22 @@ const httpServer = http.createServer((req, res) => {
       // SPA fallback — serve index.html for unknown routes
       fs.readFile(path.join(__dirname, 'public', 'index.html'), (err2, data2) => {
         if (err2) { res.writeHead(404); res.end('Not Found'); return; }
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.writeHead(200, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        });
         res.end(data2);
       });
       return;
     }
-    res.writeHead(200, { 'Content-Type': mime });
+    res.writeHead(200, {
+      'Content-Type': mime,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
     res.end(data);
   });
 });
@@ -100,7 +110,17 @@ wss.on('connection', (ws, req) => {
       const str = raw.toString();
       try {
         const msg = JSON.parse(str);
-        if (msg.type === 'state') lastState = str; // cache
+        if (msg.type === 'state') lastState = str;
+        if (msg.type === 'pump_mode' || msg.action === 'pump_mode' || msg.mode) {
+          if (lastState) {
+            let cached = JSON.parse(lastState);
+            if (cached.pump) {
+              cached.pump.mode = String(msg.mode || msg.state || 'AUTO').toUpperCase();
+              cached.pump_auto_mode = (cached.pump.mode === 'AUTO' || cached.pump.mode === 'AUTOMATIC');
+              lastState = JSON.stringify(cached);
+            }
+          }
+        }
       } catch (_) {}
       broadcastBrowsers(str); // Forward to all browsers
     });
@@ -126,9 +146,25 @@ wss.on('connection', (ws, req) => {
     ws.send(JSON.stringify({ type: 'device_status', online: devOnline }));
 
     ws.on('message', (raw) => {
+      const str = raw.toString();
+      try {
+        const msg = JSON.parse(str);
+        if (msg.type === 'pump_mode' || msg.action === 'pump_mode' || msg.mode) {
+          if (lastState) {
+            let cached = JSON.parse(lastState);
+            if (cached.pump) {
+              cached.pump.mode = String(msg.mode || msg.state || 'AUTO').toUpperCase();
+              cached.pump_auto_mode = (cached.pump.mode === 'AUTO' || cached.pump.mode === 'AUTOMATIC');
+              lastState = JSON.stringify(cached);
+              broadcastBrowsers(lastState); // Immediate UI update for all browsers!
+            }
+          }
+        }
+      } catch (_) {}
+
       // Browser → ESP32
       if (esp32 && esp32.readyState === WebSocket.OPEN) {
-        esp32.send(raw.toString());
+        esp32.send(str);
       }
     });
 

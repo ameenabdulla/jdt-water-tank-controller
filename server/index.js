@@ -250,8 +250,8 @@ setInterval(() => { broadcastState(); }, 5000);
 
 server.listen(PORT, () => {
   console.log(`====================================================`);
-  console.log(` JDT Water Tank Controller Server Running!`);
+  console.log(` EET Water Tank Controller Server`);
+  console.log(` Easy Electro Tech`);
   console.log(` Port: ${PORT}`);
-  console.log(` Dashboard: http://localhost:${PORT}`);
   console.log(`====================================================`);
 });
