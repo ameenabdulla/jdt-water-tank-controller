@@ -1,7 +1,6 @@
 /**
- * Smart Home IoT — Render.com WebSocket Relay Server
- * Bridges ESP32 hardware (/device) with web browsers (/ws)
- * Works 100% free on Render.com
+ * JDT Water Tank Controller — Render.com WebSocket Relay Server
+ * Bridges ESP32 hardware and web browsers seamlessly.
  */
 
 'use strict';
@@ -12,9 +11,7 @@ const path  = require('path');
 
 const PORT = process.env.PORT || 10000;
 
-// ──────────────────────────────────────────────────────────
-// Static file server for the web dashboard
-// ──────────────────────────────────────────────────────────
+// MIME types
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css' : 'text/css',
@@ -25,11 +22,9 @@ const MIME = {
 };
 
 const httpServer = http.createServer((req, res) => {
-  // Strip query string
   let urlPath = req.url.split('?')[0];
   if (urlPath === '/') urlPath = '/index.html';
 
-  // Block WebSocket upgrade paths from HTTP handler
   if (urlPath === '/ws' || urlPath === '/device') {
     res.writeHead(426, { 'Content-Type': 'text/plain' });
     res.end('WebSocket only');
@@ -42,7 +37,6 @@ const httpServer = http.createServer((req, res) => {
 
   fs.readFile(filePath, (err, data) => {
     if (err) {
-      // SPA fallback — serve index.html for unknown routes
       fs.readFile(path.join(__dirname, 'public', 'index.html'), (err2, data2) => {
         if (err2) { res.writeHead(404); res.end('Not Found'); return; }
         res.writeHead(200, {
@@ -65,27 +59,23 @@ const httpServer = http.createServer((req, res) => {
   });
 });
 
-// ──────────────────────────────────────────────────────────
 // WebSocket relay
-//   /device  → ESP32 hardware
-//   /ws      → browser clients
-// ──────────────────────────────────────────────────────────
 const wss = new WebSocket.Server({ noServer: true });
 
-let esp32  = null;            // The one ESP32 connection
-const browsers = new Set();   // All browser connections
-let lastState  = null;        // Cache last state for new browsers
+const clients = new Set();
+let lastTelemetry = null;
 
-function broadcastBrowsers(data) {
-  browsers.forEach(ws => {
-    if (ws.readyState === WebSocket.OPEN) ws.send(data);
+function broadcast(data, originWs = null) {
+  clients.forEach(ws => {
+    if (ws !== originWs && ws.readyState === WebSocket.OPEN) {
+      ws.send(data);
+    }
   });
 }
 
 httpServer.on('upgrade', (req, socket, head) => {
   const url = req.url.split('?')[0];
-
-  if (url === '/device' || url === '/ws') {
+  if (url === '/ws' || url === '/device') {
     wss.handleUpgrade(req, socket, head, (ws) => {
       wss.emit('connection', ws, req);
     });
@@ -95,101 +85,43 @@ httpServer.on('upgrade', (req, socket, head) => {
 });
 
 wss.on('connection', (ws, req) => {
-  const url = req.url.split('?')[0];
-  const isDevice = (url === '/device');
+  clients.add(ws);
+  console.log(`[WS] Client Connected (${clients.size} total)`);
 
-  if (isDevice) {
-    // ── ESP32 connected ──────────────────────────────────
-    esp32 = ws;
-    console.log('[ESP32] Connected ✓');
-
-    // Tell all browsers the device came online
-    broadcastBrowsers(JSON.stringify({ type: 'device_status', online: true }));
-
-    ws.on('message', (raw) => {
-      const str = raw.toString();
-      try {
-        const msg = JSON.parse(str);
-        if (msg.type === 'state') lastState = str;
-        if (msg.type === 'pump_mode' || msg.action === 'pump_mode' || msg.mode) {
-          if (lastState) {
-            let cached = JSON.parse(lastState);
-            if (cached.pump) {
-              cached.pump.mode = String(msg.mode || msg.state || 'AUTO').toUpperCase();
-              cached.pump_auto_mode = (cached.pump.mode === 'AUTO' || cached.pump.mode === 'AUTOMATIC');
-              lastState = JSON.stringify(cached);
-            }
-          }
-        }
-      } catch (_) {}
-      broadcastBrowsers(str); // Forward to all browsers
-    });
-
-    ws.on('close', () => {
-      console.log('[ESP32] Disconnected');
-      if (esp32 === ws) esp32 = null;
-      broadcastBrowsers(JSON.stringify({ type: 'device_status', online: false }));
-    });
-
-    ws.on('error', (e) => console.error('[ESP32] Error:', e.message));
-
-  } else {
-    // ── Browser connected ────────────────────────────────
-    browsers.add(ws);
-    console.log(`[Browser] Connected  (${browsers.size} online)`);
-
-    // Send cached state immediately so UI populates
-    if (lastState) ws.send(lastState);
-
-    // Send current device online/offline status
-    const devOnline = esp32 !== null && esp32.readyState === WebSocket.OPEN;
-    ws.send(JSON.stringify({ type: 'device_status', online: devOnline }));
-
-    ws.on('message', (raw) => {
-      const str = raw.toString();
-      try {
-        const msg = JSON.parse(str);
-        if (msg.type === 'pump_mode' || msg.action === 'pump_mode' || msg.mode) {
-          if (lastState) {
-            let cached = JSON.parse(lastState);
-            if (cached.pump) {
-              cached.pump.mode = String(msg.mode || msg.state || 'AUTO').toUpperCase();
-              cached.pump_auto_mode = (cached.pump.mode === 'AUTO' || cached.pump.mode === 'AUTOMATIC');
-              lastState = JSON.stringify(cached);
-              broadcastBrowsers(lastState); // Immediate UI update for all browsers!
-            }
-          }
-        }
-      } catch (_) {}
-
-      // Browser → ESP32
-      if (esp32 && esp32.readyState === WebSocket.OPEN) {
-        esp32.send(str);
-      }
-    });
-
-    ws.on('close', () => {
-      browsers.delete(ws);
-      console.log(`[Browser] Disconnected (${browsers.size} online)`);
-    });
-
-    ws.on('error', (e) => console.error('[Browser] Error:', e.message));
+  // Send last cached telemetry if available
+  if (lastTelemetry) {
+    ws.send(lastTelemetry);
   }
+
+  ws.on('message', (raw) => {
+    const str = raw.toString();
+    try {
+      const msg = JSON.parse(str);
+      if (msg.type === 'telemetry' || msg.distanceCm !== undefined) {
+        lastTelemetry = str;
+      }
+    } catch (_) {}
+    
+    // Broadcast message to all other connected clients (ESP32 <-> Browser)
+    broadcast(str, ws);
+  });
+
+  ws.on('close', () => {
+    clients.delete(ws);
+    console.log(`[WS] Client Disconnected (${clients.size} remaining)`);
+  });
+
+  ws.on('error', (e) => console.error('[WS] Error:', e.message));
 });
 
-// ──────────────────────────────────────────────────────────
-// Keep Render.com free tier alive (self-ping every 14 min)
-// ──────────────────────────────────────────────────────────
+// Keep Render.com free tier alive
 const SELF_URL = process.env.RENDER_EXTERNAL_URL;
 if (SELF_URL) {
   setInterval(() => {
     require('https').get(SELF_URL, () => {}).on('error', () => {});
-    console.log('[Keep-Alive] Ping sent to', SELF_URL);
   }, 14 * 60 * 1000);
 }
 
 httpServer.listen(PORT, () => {
-  console.log(`Smart Home Server running on port ${PORT}`);
-  console.log(`  ESP32  → wss://<host>/device`);
-  console.log(`  Browser→ wss://<host>/ws`);
+  console.log(`JDT Water Tank Server running on port ${PORT}`);
 });
