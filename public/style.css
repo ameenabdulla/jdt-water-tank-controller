@@ -156,7 +156,27 @@ body {
   box-shadow: 0 0 6px currentColor;
 }
 
-/* Icon buttons (theme + settings) */
+/* Theme toggle button — big visible Dark/Light switcher */
+.theme-toggle-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-accent);
+  border-radius: 9px;
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 0.78rem; font-weight: 800;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.theme-toggle-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  box-shadow: 0 0 12px rgba(56,189,248,0.15);
+}
+.theme-toggle-btn i { width: 16px; height: 16px; }
+
+/* Icon buttons (settings) */
 .icon-btn {
   width: 36px; height: 36px;
   display: grid; place-items: center;

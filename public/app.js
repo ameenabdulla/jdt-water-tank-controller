@@ -73,6 +73,7 @@
       statusText: document.getElementById('status-text'),
       btnTheme: document.getElementById('btn-theme'),
       themeIcon: document.getElementById('theme-icon'),
+      themeLabel: document.getElementById('theme-label'),
       btnSettings: document.getElementById('btn-settings'),
       // Tank
       water: document.getElementById('water'),
@@ -131,6 +132,7 @@
     $.html.setAttribute('data-theme', theme);
     const iconName = theme === 'dark' ? 'moon' : 'sun';
     if ($.themeIcon) $.themeIcon.setAttribute('data-lucide', iconName);
+    if ($.themeLabel) $.themeLabel.textContent = theme === 'dark' ? 'Dark' : 'Light';
     if (window.lucide) lucide.createIcons();
   }
 
