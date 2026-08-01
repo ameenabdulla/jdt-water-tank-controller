@@ -3,8 +3,6 @@
   ║   JDT Islam Institute - Water Tank Controller        ║
   ║   Board    : ESP32 Dev Module                        ║
   ║   Reset Pin: GPIO 4 (Hold 5s to Reset WiFi)          ║
-  ║   Logic    : Below 20cm = Lock at 20.0cm            ║
-  ║              Above 20cm = Show Exact Distance        ║
   ╚══════════════════════════════════════════════════════╝
 */
 
@@ -28,11 +26,11 @@ const char* WS_PATH = "/ws";
 
 // Tank Config
 const float TANK_DEPTH_CM = 100.0;
-const float SENSOR_OFFSET = 20.0; // Min 20cm offset for 100% Full
+const float SENSOR_OFFSET = 25.0;
 const float AUTO_PUMP_ON   = 20.0;
 const float AUTO_PUMP_OFF  = 90.0;
 
-// Objects
+// Objects & State
 WebSocketsClient webSocket;
 WebServer        server(80);
 Preferences      preferences;
@@ -40,13 +38,11 @@ DNSServer        dnsServer;
 
 const byte DNS_PORT = 53;
 
-// State Variables
 String deviceName;
 String ssid;
 String password;
 bool isAPMode = false;
 float smoothedDistance = 0;
-float lastValidDistance = 20.0;
 bool pumpState = false;
 bool sensorError = false;
 int failedReadings = 0;
@@ -57,11 +53,7 @@ bool ledState = false;
 unsigned long buttonPressTime = 0;
 bool buttonHeld = false;
 
-// Async WiFi Scanner State
-int scanResultsCount = -1;
-bool isScanning = false;
-
-// Captive Portal HTML with Zero-Lag Async Scanner
+// Captive Portal HTML
 const char INDEX_HTML[] PROGMEM = R"html(
 <!DOCTYPE html>
 <html>
@@ -70,99 +62,27 @@ const char INDEX_HTML[] PROGMEM = R"html(
   <title>JDT Tank Setup</title>
   <style>
     body { font-family: sans-serif; background-color: #030712; color: #e0e0e0; text-align: center; margin: 0; padding: 20px; }
-    h1 { color: #0ea5e9; margin-bottom: 5px; }
-    p.sub { color: #64748b; font-size: 0.85rem; margin-top: 0; margin-bottom: 20px; }
+    h1 { color: #0ea5e9; }
     form { background-color: #0f172a; padding: 25px; border-radius: 16px; display: inline-block; border: 1px solid rgba(56,189,248,0.2); max-width: 90%; width: 320px; box-shadow: 0 20px 40px rgba(0,0,0,0.8); }
-    label { display: block; text-align: left; font-size: 0.8rem; color: #94a3b8; margin-top: 12px; margin-bottom: 4px; font-weight: bold; }
-    input, select { display: block; margin: 0 auto 12px auto; padding: 12px; width: 100%; border: 1px solid #334155; border-radius: 8px; box-sizing: border-box; background-color: #1e293b; color: #fff; font-size: 0.95rem; }
-    input:focus, select:focus { outline: 2px solid #0ea5e9; }
+    input { display: block; margin: 15px auto; padding: 12px; width: calc(100% - 24px); border: 1px solid #334155; border-radius: 8px; box-sizing: border-box; background-color: #1e293b; color: #fff; }
+    input:focus { outline: 2px solid #0ea5e9; }
     input[type=submit] { background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff; font-weight: bold; cursor: pointer; margin-top: 20px; border: none; }
-    .scan-status { font-size: 0.78rem; color: #38bdf8; text-align: left; margin-top: -6px; margin-bottom: 10px; }
   </style>
 </head>
 <body>
   <h1>JDT Tank Setup</h1>
-  <p class="sub">Instant Zero-Lag Configuration</p>
-
   <form action="/save" method="post">
-    <label>Device Name</label>
-    <input type="text" name="name" placeholder="e.g. Rooftop Tank" required>
-
-    <label>Select WiFi Network</label>
-    <select id="wifiList" name="ssid" required>
-      <option value="">Scanning for networks...</option>
-    </select>
-    <div id="scanStatus" class="scan-status">⚡ Instant WiFi Scan...</div>
-
-    <label>WiFi Password</label>
-    <input type="password" name="pass" placeholder="Enter WiFi Password">
-
+    <input type="text" name="name" placeholder="Device Name" required>
+    <input type="text" name="ssid" placeholder="WiFi SSID" required>
+    <input type="password" name="pass" placeholder="WiFi Password" required>
     <input type="submit" value="Save & Connect">
   </form>
-
-  <script>
-    function fetchWiFi() {
-      fetch('/scan')
-        .then(res => res.json())
-        .then(data => {
-          const list = document.getElementById('wifiList');
-          const status = document.getElementById('scanStatus');
-          if (data.status === 'scanning') {
-            setTimeout(fetchWiFi, 500);
-            return;
-          }
-          list.innerHTML = '';
-          if (!data.networks || data.networks.length === 0) {
-            list.innerHTML = '<option value="">No WiFi Found (Refreshing...)</option>';
-            status.innerHTML = '❌ No networks found';
-            setTimeout(fetchWiFi, 2000);
-          } else {
-            status.innerHTML = '✅ Found ' + data.networks.length + ' WiFi networks';
-            data.networks.forEach(item => {
-              const opt = document.createElement('option');
-              opt.value = item.ssid;
-              opt.innerHTML = item.ssid + ' (' + item.rssi + ' dBm)';
-              list.appendChild(opt);
-            });
-          }
-        })
-        .catch(err => {
-          document.getElementById('scanStatus').innerHTML = '⚠️ Tap to select network';
-        });
-    }
-    fetchWiFi();
-  </script>
 </body>
 </html>
 )html";
 
 void handleRoot() {
   server.send(200, "text/html", INDEX_HTML);
-}
-
-void handleScan() {
-  if (scanResultsCount == -1 && !isScanning) {
-    WiFi.scanNetworks(true); // Start Async non-blocking scan
-    isScanning = true;
-    server.send(200, "application/json", "{\"status\":\"scanning\"}");
-    return;
-  }
-  
-  scanResultsCount = WiFi.scanComplete();
-  if (scanResultsCount < 0) {
-    server.send(200, "application/json", "{\"status\":\"scanning\"}");
-  } else {
-    String json = "{\"status\":\"complete\",\"networks\":[";
-    for (int i = 0; i < scanResultsCount; ++i) {
-      if (i > 0) json += ",";
-      json += "{\"ssid\":\"" + WiFi.SSID(i) + "\",\"rssi\":" + String(WiFi.RSSI(i)) + "}";
-    }
-    json += "]}";
-    WiFi.scanDelete();
-    scanResultsCount = -1;
-    isScanning = false;
-    server.send(200, "application/json", json);
-  }
 }
 
 void handleSave() {
@@ -181,7 +101,7 @@ void handleSave() {
   html += F("<body><h1>Saved successfully!</h1><p style=\"color:#e0e0e0\">Connecting to WiFi...</p></body></html>");
   
   server.send(200, "text/html", html);
-  delay(1000);
+  delay(2000);
   ESP.restart();
 }
 
@@ -197,19 +117,19 @@ float measureDistance() {
   delayMicroseconds(10);
   digitalWrite(TRIG_PIN, LOW);
   
-  long duration = pulseIn(ECHO_PIN, HIGH, 35000);
-  if (duration == 0) return -1.0;
+  long duration = pulseIn(ECHO_PIN, HIGH, 30000);
+  if (duration == 0) return 0.0;
   
   float distance = (duration * 0.0343) / 2.0;
+  if (distance < 20.0 || distance > 450.0) return 0.0;
   return distance;
 }
 
 float toPercent(float dist) {
-  float usableDepth = TANK_DEPTH_CM - SENSOR_OFFSET;
-  float waterLevel  = usableDepth - (dist - SENSOR_OFFSET);
+  float waterLevel = TANK_DEPTH_CM - (dist - SENSOR_OFFSET);
   if (waterLevel < 0) waterLevel = 0;
-  if (waterLevel > usableDepth) waterLevel = usableDepth;
-  return (waterLevel / usableDepth) * 100.0;
+  if (waterLevel > TANK_DEPTH_CM) waterLevel = TANK_DEPTH_CM;
+  return (waterLevel / TANK_DEPTH_CM) * 100.0;
 }
 
 void checkResetButton() {
@@ -284,26 +204,23 @@ void setup() {
   if (ssid == "") {
     isAPMode = true;
     Serial.println(F("Starting AP Mode: JDT-Tank-Setup"));
-    WiFi.mode(WIFI_AP);
     WiFi.softAP("JDT-Tank-Setup", "12345678");
     dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
     
     server.on("/", HTTP_GET, handleRoot);
-    server.on("/scan", HTTP_GET, handleScan);
     server.on("/save", HTTP_POST, handleSave);
     server.onNotFound(handleNotFound);
     server.begin();
     Serial.println(F("Portal started at 192.168.4.1"));
   } else {
     isAPMode = false;
-    WiFi.mode(WIFI_STA);
     WiFi.begin(ssid.c_str(), password.c_str());
     Serial.print(F("Connecting to WiFi: "));
     Serial.println(ssid);
     
     unsigned long startAttemptTime = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 15000) {
-      delay(200);
+      delay(500);
       Serial.print(F("."));
       checkResetButton();
     }
@@ -317,7 +234,7 @@ void setup() {
     
     webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH);
     webSocket.onEvent(webSocketEvent);
-    webSocket.setReconnectInterval(2000);
+    webSocket.setReconnectInterval(3000);
   }
 }
 
@@ -349,52 +266,30 @@ void loop() {
     webSocket.loop();
   }
   
-  // High-speed telemetry update every 100ms
-  if (millis() - lastTelemetryTime > 100) {
+  if (millis() - lastTelemetryTime > 250) {
     lastTelemetryTime = millis();
     
     float newDist = measureDistance();
-    
-    // STRICT RULE:
-    // Any reading below 20cm (or blind zone echo spike) is locked to exactly 20.0 cm!
-    // Any reading above 20cm shows its exact measured distance!
-    if (newDist > 0.0 && newDist < 20.0) {
-      newDist = 20.0;
-    }
-
-    if (lastValidDistance <= 22.0 && newDist > 80.0) {
-      // Blind zone secondary echo jump -> lock to 20.0 cm
-      newDist = 20.0;
-    }
-
-    if (newDist > 0.0) {
+    if (newDist > 0) {
       failedReadings = 0;
       sensorError = false;
-      lastValidDistance = newDist;
-
-      if (smoothedDistance == 0.0) {
+      if (smoothedDistance == 0) {
         smoothedDistance = newDist;
       } else {
-        smoothedDistance = (smoothedDistance * 0.7) + (newDist * 0.3);
+        smoothedDistance = (smoothedDistance * 0.6) + (newDist * 0.4);
       }
     } else {
       failedReadings++;
-      if (failedReadings >= 15) {
+      if (failedReadings >= 5) {
         sensorError = true;
       }
     }
     
-    // Ensure display distance is locked to 20.0cm if below 20cm
-    float activeDistance = (smoothedDistance > 0.0) ? smoothedDistance : lastValidDistance;
-    if (activeDistance < 20.0) {
-      activeDistance = 20.0;
-    }
-
-    float pct = toPercent(activeDistance);
+    float pct = toPercent(smoothedDistance);
     
     if (webSocket.isConnected()) {
       String json = "{\"type\":\"telemetry\",\"distanceCm\":";
-      json += String(sensorError ? -1.0 : activeDistance, 2);
+      json += String(sensorError ? -1.0 : smoothedDistance, 2);
       json += ",\"sensorError\":";
       json += (sensorError ? "true" : "false");
       json += ",\"rssi\":";
