@@ -1,15 +1,20 @@
 /**
- * ESP32 WebSocket & REST API Integration Bridge
- * Connects frontend dashboard to ESP32 WebSocket server (ws://${location.host}/ws).
- * Handles real-time telemetry streaming & remote device control.
+ * Smart Home IoT — Remote WebSocket Bridge (Render.com)
+ * Connects browser dashboard to Render.com relay server → ESP32
+ * Drop-in replacement for local esp32-ws.js
  */
-(function() {
+(function () {
     'use strict';
+
+    // ── Render.com server URL (auto-detected from current page host) ──
+    const RENDER_HOST = location.hostname;
+    const WS_PROTOCOL = location.protocol === 'https:' ? 'wss://' : 'ws://';
+    const WS_URL = WS_PROTOCOL + RENDER_HOST + '/ws';
 
     let ws = null;
     let reconnectTimer = null;
     let isConnected = false;
-    const WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + (location.host || '192.168.4.1') + '/ws';
+    let deviceOnline = false;
 
     function init() {
         connect();
@@ -21,49 +26,51 @@
         try {
             ws = new WebSocket(WS_URL);
         } catch (e) {
-            console.warn('[ESP32 WS] Connection error:', e);
+            console.warn('[Remote WS] Cannot connect:', e);
             scheduleReconnect();
             return;
         }
 
-        ws.onopen = function() {
-            console.log('[ESP32 WS] Connected to ' + WS_URL);
+        ws.onopen = function () {
+            console.log('[Remote WS] Connected to Render.com server:', WS_URL);
             isConnected = true;
-            updateStatusUI(true);
-            if (window.WaterTank && window.WaterTank.stopDemo) {
-                window.WaterTank.stopDemo();
-            }
-            if (window.SafetyMonitor && window.SafetyMonitor.stopAutoDemo) {
-                window.SafetyMonitor.stopAutoDemo();
-            }
-            if (window.Toast) {
-                window.Toast.showToast('ESP32 WebSocket Connected');
-            }
+            updateStatusUI('server');
+            if (window.Toast) window.Toast.showToast('Server Connected — Waiting for ESP32...');
         };
 
-        ws.onmessage = function(event) {
+        ws.onmessage = function (event) {
             try {
                 const data = JSON.parse(event.data);
+
+                // Handle device online/offline notifications
+                if (data.type === 'device_status') {
+                    deviceOnline = data.online;
+                    updateStatusUI(data.online ? 'online' : 'offline');
+                    if (data.online) {
+                        if (window.Toast) window.Toast.showToast('ESP32 Online — Live Control Active');
+                        if (window.WaterTank && window.WaterTank.stopDemo) window.WaterTank.stopDemo();
+                        if (window.SafetyMonitor && window.SafetyMonitor.stopAutoDemo) window.SafetyMonitor.stopAutoDemo();
+                    } else {
+                        if (window.Toast) window.Toast.showToast('ESP32 Offline — Check device power');
+                    }
+                    return;
+                }
+
                 handleStateMessage(data);
             } catch (err) {
-                console.error('[ESP32 WS] Error parsing packet:', err);
+                console.error('[Remote WS] Parse error:', err);
             }
         };
 
-        ws.onclose = function() {
-            if (isConnected) {
-                console.warn('[ESP32 WS] Disconnected from hardware');
-                if (window.Toast) {
-                    window.Toast.showToast('ESP32 Disconnected — Operating in Demo Mode');
-                }
-            }
+        ws.onclose = function () {
+            if (isConnected) console.warn('[Remote WS] Server disconnected');
             isConnected = false;
-            updateStatusUI(false);
+            deviceOnline = false;
+            updateStatusUI('offline');
             scheduleReconnect();
         };
 
-        ws.onerror = function(err) {
-            console.warn('[ESP32 WS] Error:', err);
+        ws.onerror = function () {
             ws.close();
         };
     }
@@ -73,17 +80,21 @@
         reconnectTimer = setTimeout(connect, 3000);
     }
 
-    function updateStatusUI(online) {
-        const dot = document.getElementById('system-status-dot');
+    function updateStatusUI(status) {
+        const dot  = document.getElementById('system-status-dot');
         const text = document.getElementById('system-status-text');
-        if (dot && text) {
-            if (online) {
-                dot.className = 'status-dot online';
-                text.textContent = 'ESP32 ONLINE';
-            } else {
-                dot.className = 'status-dot offline';
-                text.textContent = 'OFFLINE (DEMO)';
-            }
+        if (!dot || !text) return;
+        if (status === 'online') {
+            dot.className  = 'status-dot online';
+            text.textContent = 'ESP32 ONLINE';
+        } else if (status === 'server') {
+            dot.className  = 'status-dot'; // yellow-ish
+            dot.style.background = '#f59e0b';
+            text.textContent = 'SERVER OK — ESP32 Connecting...';
+        } else {
+            dot.className  = 'status-dot offline';
+            dot.style.background = '';
+            text.textContent = 'OFFLINE (DEMO)';
         }
     }
 
@@ -91,59 +102,36 @@
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify(data));
         } else {
-            // Fallback REST POST if WebSocket is closed
-            fetch('/api/' + data.type, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            }).catch(err => console.warn('[ESP32 REST Fallback Error]', err));
+            console.warn('[Remote WS] Not connected — command dropped');
         }
     }
 
     function handleStateMessage(data) {
         if (data.type !== 'state') return;
 
-        // 1. Lights
-        if (Array.isArray(data.lights) && window.LightControl && window.LightControl.applyServerState) {
+        if (Array.isArray(data.lights) && window.LightControl && window.LightControl.applyServerState)
             window.LightControl.applyServerState(data.lights);
-        }
 
-        // 2. Gate
-        if (data.gate && window.GateControl && window.GateControl.applyServerState) {
+        if (data.gate && window.GateControl && window.GateControl.applyServerState)
             window.GateControl.applyServerState(data.gate.pos, data.gate.status);
-        }
 
-        // 3. Servo
-        if (data.servo && window.ServoControl && window.ServoControl.applyServerState) {
-            window.ServoControl.applyServerState(data.servo.angle, data.servo.on);
-        }
-
-        // 4. Pump
-        if (data.pump && window.PumpControl && window.PumpControl.applyServerState) {
+        if (data.pump && window.PumpControl && window.PumpControl.applyServerState)
             window.PumpControl.applyServerState(data.pump.on, data.pump.mode);
-        }
 
-        // 5. Water level
-        if (data.water && window.WaterTank && window.WaterTank.applyServerState) {
+        if (data.water && window.WaterTank && window.WaterTank.applyServerState)
             window.WaterTank.applyServerState(data.water.distance, data.water.level, data.water.height);
-        }
 
-        // 6. Safety Sensors (Gas, Flame, IR)
-        if (window.SafetyMonitor && window.SafetyMonitor.applyServerState) {
+        if (window.SafetyMonitor && window.SafetyMonitor.applyServerState)
             window.SafetyMonitor.applyServerState(data.gas, data.flame, data.ir);
-        }
 
-        // 7. Dashboard Settings & System Name
-        if (data.settings && window.Settings && window.Settings.applyServerSettings) {
+        if (data.settings && window.Settings && window.Settings.applyServerSettings)
             window.Settings.applyServerSettings(data.settings);
-        }
     }
 
-    // Export WebSocket Controller to global scope
     window.ESP32WS = {
         init,
         send: sendCommand,
-        isConnected: () => isConnected
+        isConnected: () => isConnected && deviceOnline
     };
 
     document.addEventListener('DOMContentLoaded', init);
