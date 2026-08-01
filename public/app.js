@@ -305,6 +305,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // ── Expose for WebSocket bridge (esp32-ws.js) ──
+  window.AquaSense = {
+    updateFromWS: function(data) {
+      state.connected = true;
+      state.sensorError = data.sensorError || false;
+      state.distanceCm = data.distanceCm;
+      state.rssi = data.rssi || state.rssi;
+
+      // Calculate water level from distance
+      const usableDepth = state.tankDepthCm - state.sensorOffsetCm;
+      const waterDepth = usableDepth - (data.distanceCm - state.sensorOffsetCm);
+      state.waterDepthCm = Math.max(0, Math.round(waterDepth));
+      state.waterLevelPct = Math.max(0, Math.min(100, (waterDepth / usableDepth) * 100));
+      state.volumeLiters = Math.round(state.waterLevelPct * 10);
+
+      updateUI();
+    }
+  };
+
   // ── Start ──
   fetchTelemetry();
   setInterval(fetchTelemetry, 1000);
