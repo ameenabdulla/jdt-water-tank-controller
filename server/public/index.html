@@ -1,185 +1,246 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="ESP32 Smart Water Tank Monitoring System — Real-time water level, automatic pump control, and live dashboard.">
   <title>JDT Water Tank Controller</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <div class="app-container">
+  <div class="app">
 
-    <!-- Top Header Bar -->
-    <header class="header">
+    <!-- ─── Header ─── -->
+    <header class="header" id="header">
       <div class="brand">
-        <div class="brand-icon">
-          <i data-lucide="droplet"></i>
-        </div>
-        <div class="brand-info">
-          <h1>JDT Water Tank</h1>
-          <p>Islam Institute &bull; IoT Controller</p>
+        <div class="brand-icon"><i data-lucide="droplets"></i></div>
+        <div>
+          <h1 class="brand-name">JDT Water Tank</h1>
+          <p class="brand-sub">Islam Institute &bull; IoT Controller</p>
         </div>
       </div>
-      <div class="header-right">
-        <div id="status-pill" class="status-pill online">
-          <span class="dot"></span>
-          <span id="status-text">ESP32 ONLINE</span>
+      <div class="header-actions">
+        <div class="status-pill" id="status-pill">
+          <span class="status-dot"></span>
+          <span id="status-text">CONNECTING</span>
         </div>
-        <button class="btn-gear" id="btn-open-settings" title="Settings">
+        <button class="icon-btn" id="btn-theme" title="Toggle theme">
+          <i data-lucide="moon" id="theme-icon"></i>
+        </button>
+        <button class="icon-btn" id="btn-settings" title="Settings">
           <i data-lucide="settings"></i>
         </button>
       </div>
     </header>
 
-    <!-- Main Dashboard -->
+    <!-- ─── Dashboard ─── -->
     <main class="dashboard">
 
-      <!-- Left: 3D Water Tank -->
-      <section class="tank-section">
-        <div class="tank-frame">
-          <div class="tank-top-cap">
-            <i data-lucide="radio" class="sensor-icon"></i>
+      <!-- Left: Tank Visualizer -->
+      <section class="tank-col">
+        <div class="tank-container">
+          <!-- Sensor cap -->
+          <div class="sensor-cap">
+            <i data-lucide="radio" class="sensor-cap-icon"></i>
           </div>
-          <div class="tank-glass">
-            <div class="water-fill" id="water-fill" style="height: 74.5%;">
-              <div class="wave wave1"></div>
-              <div class="wave wave2"></div>
+          <!-- Glass body -->
+          <div class="tank-body">
+            <div class="water" id="water" style="height:0%">
+              <div class="wave w1"></div>
+              <div class="wave w2"></div>
             </div>
-            <div class="tank-ticks">
-              <span class="tick" style="bottom: 100%;">100%</span>
-              <span class="tick" style="bottom: 75%;">75%</span>
-              <span class="tick" style="bottom: 50%;">50%</span>
-              <span class="tick" style="bottom: 25%;">25%</span>
-              <span class="tick" style="bottom: 0%;">0%</span>
+            <!-- Scale ticks -->
+            <div class="scale">
+              <span style="bottom:100%">100</span>
+              <span style="bottom:75%">75</span>
+              <span style="bottom:50%">50</span>
+              <span style="bottom:25%">25</span>
+              <span style="bottom:0%">0</span>
             </div>
           </div>
-          <div class="tank-base"></div>
+          <!-- Base -->
+          <div class="tank-base-plate"></div>
+        </div>
+        <!-- Level text below tank on mobile -->
+        <div class="tank-level-label">
+          <span id="tank-level-text">0%</span>
         </div>
       </section>
 
-      <!-- Right: Metrics + Pump Control -->
-      <section class="right-section">
+      <!-- Right: Metrics + Controls -->
+      <section class="info-col">
 
-        <!-- Big Water Level Card -->
-        <div class="level-card">
-          <span class="level-label">WATER LEVEL</span>
-          <div class="level-value-row">
-            <span class="level-number" id="level-percent">74.5</span>
-            <span class="level-unit">%</span>
+        <!-- Hero: Water Level -->
+        <div class="card card-hero">
+          <span class="card-label">WATER LEVEL</span>
+          <div class="hero-row">
+            <span class="hero-num" id="lvl-num">0.0</span>
+            <span class="hero-unit">%</span>
+          </div>
+          <div class="hero-bar-track">
+            <div class="hero-bar-fill" id="lvl-bar" style="width:0%"></div>
           </div>
         </div>
 
-        <!-- Three Small Metric Cards -->
-        <div class="metrics-row">
-          <div class="metric-card">
-            <span class="metric-label">DISTANCE</span>
-            <div class="metric-value-row">
-              <span class="metric-number" id="distance-cm">29.2</span>
+        <!-- 4 Metric cards -->
+        <div class="metrics">
+          <div class="card card-metric">
+            <span class="card-label">DISTANCE</span>
+            <div class="metric-row">
+              <span class="metric-num" id="m-dist">--</span>
               <span class="metric-unit">cm</span>
             </div>
+            <span class="metric-hint">Sensor air gap</span>
           </div>
-          <div class="metric-card">
-            <span class="metric-label">TANK DEPTH</span>
-            <div class="metric-value-row">
-              <span class="metric-number" id="water-depth-cm">100</span>
+          <div class="card card-metric">
+            <span class="card-label">WATER DEPTH</span>
+            <div class="metric-row">
+              <span class="metric-num" id="m-depth">--</span>
               <span class="metric-unit">cm</span>
             </div>
+            <span class="metric-hint">Current depth</span>
           </div>
-          <div class="metric-card">
-            <span class="metric-label">WIFI SIGNAL</span>
-            <div class="metric-value-row">
-              <span class="metric-number" id="rssi-val">-35</span>
+          <div class="card card-metric">
+            <span class="card-label">TANK HEIGHT</span>
+            <div class="metric-row">
+              <span class="metric-num" id="m-tank">100</span>
+              <span class="metric-unit">cm</span>
+            </div>
+            <span class="metric-hint">Configured in settings</span>
+          </div>
+          <div class="card card-metric">
+            <span class="card-label">WIFI SIGNAL</span>
+            <div class="metric-row">
+              <span class="metric-num" id="m-rssi">--</span>
               <span class="metric-unit">dBm</span>
             </div>
+            <span class="metric-hint" id="rssi-quality">--</span>
           </div>
         </div>
 
-        <!-- Pump Control Card -->
-        <div class="pump-card">
-          <div class="pump-header">
-            <i data-lucide="zap" class="pump-icon"></i>
+        <!-- Pump Control -->
+        <div class="card card-pump">
+          <div class="pump-head">
+            <div class="pump-icon-wrap"><i data-lucide="zap"></i></div>
             <div>
-              <span class="pump-title">Pump Control</span>
-              <span class="pump-sub" id="pump-mode-sub">Mode: AUTO</span>
+              <h3 class="pump-title">Pump Control</h3>
+              <p class="pump-sub" id="pump-sub">Mode: AUTO</p>
             </div>
           </div>
-          <div class="mode-selector">
-            <button class="mode-btn active" id="btn-mode-auto">AUTO</button>
-            <button class="mode-btn" id="btn-mode-manual">MANUAL</button>
+
+          <div class="mode-tabs">
+            <button class="mode-tab active" id="tab-auto">AUTO</button>
+            <button class="mode-tab" id="tab-manual">MANUAL</button>
           </div>
+
           <div class="motor-row">
-            <span class="motor-label">Motor Status</span>
-            <span class="motor-state" id="pump-state-text">OFF</span>
-            <label class="switch">
-              <input type="checkbox" id="pump-toggle-input" disabled>
-              <span class="slider round"></span>
-            </label>
+            <div>
+              <span class="motor-label">Motor Status</span>
+              <span class="motor-detail" id="motor-detail">Relay: IDLE</span>
+            </div>
+            <div class="motor-right">
+              <span class="motor-badge" id="motor-badge">OFF</span>
+              <label class="toggle">
+                <input type="checkbox" id="pump-sw" disabled>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Threshold indicators -->
+          <div class="threshold-row" id="threshold-row">
+            <span class="threshold-item"><span class="th-dot th-low"></span>Auto ON below <strong id="th-low-val">20%</strong></span>
+            <span class="threshold-item"><span class="th-dot th-high"></span>Auto OFF above <strong id="th-high-val">90%</strong></span>
           </div>
         </div>
 
       </section>
     </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>JDT Water Tank Controller &bull; ESP32 IoT System</span>
+    </footer>
   </div>
 
-  <!-- Settings Modal -->
-  <div class="modal-overlay" id="modal-overlay">
-    <div class="modal">
-      <div class="modal-header">
-        <h2><i data-lucide="settings"></i> Settings & Calibration</h2>
-        <button class="modal-close" id="modal-close"><i data-lucide="x"></i></button>
+  <!-- ─── Settings Modal ─── -->
+  <div class="overlay" id="overlay">
+    <div class="modal" id="modal">
+      <div class="modal-head">
+        <h2><i data-lucide="sliders-horizontal"></i> Tank Settings</h2>
+        <button class="modal-x" id="modal-x"><i data-lucide="x"></i></button>
       </div>
-      <div class="modal-body">
-        <div class="setting-group">
-          <label>Tank Depth (cm)</label>
-          <p class="setting-desc">Height from sensor face to the tank bottom when empty.</p>
-          <div class="input-row">
-            <input type="number" id="input-depth" class="setting-input" value="100" min="10" max="500" step="1">
-            <span class="input-unit">cm</span>
-          </div>
-          <div class="calibrate-box">
-            <i data-lucide="info"></i>
-            <span>Current reading: <strong id="calibrate-distance">29.2 cm</strong></span>
-          </div>
-        </div>
-        <div class="setting-group">
-          <label>Sensor Top Offset (cm)</label>
-          <p class="setting-desc">Min gap from sensor face to max fill line (100% full).</p>
-          <div class="input-row">
-            <input type="number" id="input-offset" class="setting-input" value="20" min="0" max="50" step="1">
-            <span class="input-unit">cm</span>
+
+      <div class="modal-scroll">
+
+        <!-- Tank Calibration -->
+        <div class="section-title"><i data-lucide="ruler"></i> Tank Calibration</div>
+
+        <div class="field">
+          <label>Total Tank Height</label>
+          <p class="field-hint">Distance from the sensor face to the tank bottom when empty.</p>
+          <div class="field-input-row">
+            <input type="number" id="s-height" class="field-input" value="100" min="10" max="500">
+            <span class="field-unit">cm</span>
           </div>
         </div>
-        <div class="setting-group">
-          <label>Auto-Start Pump Below (%)</label>
-          <div class="slider-row">
-            <input type="range" id="input-low" class="range-slider" min="5" max="50" value="20">
-            <span class="range-val" id="low-val">20%</span>
+
+        <div class="field">
+          <label>Sensor Offset (Dead Zone)</label>
+          <p class="field-hint">Minimum gap from sensor face to max water line. For HC-SR04 typically 2–5 cm.</p>
+          <div class="field-input-row">
+            <input type="number" id="s-offset" class="field-input" value="5" min="0" max="50">
+            <span class="field-unit">cm</span>
           </div>
         </div>
-        <div class="setting-group">
-          <label>Auto-Stop Pump Above (%)</label>
-          <div class="slider-row">
-            <input type="range" id="input-high" class="range-slider" min="50" max="100" value="90">
-            <span class="range-val" id="high-val">90%</span>
+
+        <div class="field info-box">
+          <i data-lucide="activity"></i>
+          <span>Live sensor reading: <strong id="s-live-dist">-- cm</strong></span>
+        </div>
+
+        <!-- Auto Thresholds -->
+        <div class="section-title"><i data-lucide="gauge"></i> Auto Pump Thresholds</div>
+
+        <div class="field">
+          <label>Pump ON below</label>
+          <p class="field-hint">Motor starts when water level drops below this percentage.</p>
+          <div class="range-row">
+            <input type="range" id="s-low" class="range" min="5" max="50" value="20">
+            <span class="range-label" id="s-low-label">20%</span>
           </div>
         </div>
-        <div class="setting-group border-top">
-          <label><i data-lucide="wifi"></i> WiFi Credentials</label>
-          <div class="input-stack">
-            <input type="text" id="input-wifi-ssid" class="setting-input" placeholder="WiFi SSID">
-            <input type="password" id="input-wifi-pass" class="setting-input" placeholder="WiFi Password">
+
+        <div class="field">
+          <label>Pump OFF above</label>
+          <p class="field-hint">Motor stops when water level reaches this percentage.</p>
+          <div class="range-row">
+            <input type="range" id="s-high" class="range" min="50" max="100" value="90">
+            <span class="range-label" id="s-high-label">90%</span>
           </div>
         </div>
+
+        <!-- WiFi -->
+        <div class="section-title"><i data-lucide="wifi"></i> WiFi Credentials (STA Mode)</div>
+        <div class="field">
+          <label>Router SSID</label>
+          <input type="text" id="s-ssid" class="field-input full" placeholder="Your WiFi network name">
+        </div>
+        <div class="field">
+          <label>Router Password</label>
+          <input type="password" id="s-pass" class="field-input full" placeholder="Your WiFi password">
+        </div>
+
       </div>
-      <div class="modal-footer">
-        <button class="btn-save" id="btn-save-settings">
-          <i data-lucide="save"></i> Save & Apply
-        </button>
+
+      <div class="modal-foot">
+        <button class="btn-cancel" id="btn-cancel">Cancel</button>
+        <button class="btn-apply" id="btn-apply"><i data-lucide="check"></i> Save &amp; Apply</button>
       </div>
     </div>
   </div>
