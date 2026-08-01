@@ -310,7 +310,7 @@
     // Status
     if (live.connected) {
       $.statusPill.className = 'status-pill online';
-      $.statusText.textContent = 'ESP32 ONLINE';
+      $.statusText.textContent = 'DEVICE ONLINE';
     } else {
       $.statusPill.className = 'status-pill offline';
       $.statusText.textContent = 'OFFLINE';

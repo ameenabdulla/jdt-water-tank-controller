@@ -607,3 +607,42 @@ input:disabled + .tog-sl { opacity: 0.3; cursor: not-allowed; }
 }
 .btn-a:hover { transform: translateY(-1px); box-shadow: 0 5px 18px rgba(14,165,233,0.32); }
 .btn-a i { width: 14px; height: 14px; }
+
+/* ═══════════════════════════════════
+   MOBILE PHONE OPTIMIZATIONS (< 600px)
+   ═══════════════════════════════════ */
+@media (max-width: 600px) {
+  body { padding: 0; }
+  .app { padding: 12px; gap: 14px; }
+  .header { padding: 10px 14px; gap: 8px; }
+  .brand-name { font-size: 0.98rem; }
+  .brand-sub { font-size: 0.65rem; }
+  
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  
+  .theme-btn { padding: 6px 10px; font-size: 0.72rem; }
+  .icon-btn { width: 34px; height: 34px; }
+
+  .hero-num { font-size: 3rem; }
+  .hero-unit { font-size: 1.1rem; }
+
+  .metrics { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .card-metric { padding: 12px 8px; }
+  .mn { font-size: 1.3rem; }
+
+  .mtab { padding: 10px; font-size: 0.72rem; }
+  
+  /* Prevent auto zoom on iOS / Android mobile browsers */
+  .login-input, .finput { font-size: 16px !important; }
+
+  .modal { width: 100%; max-height: 92vh; border-radius: 20px 20px 0 0; }
+  .modal-body { padding: 14px; }
+  .overlay { align-items: flex-end; padding: 0; }
+}
+
