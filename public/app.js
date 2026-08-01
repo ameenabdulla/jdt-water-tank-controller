@@ -1,56 +1,60 @@
-/* AquaSense Pro — Dashboard Application Script
-   Mobile-First · Dark/Light Mode · Live WebSocket Telemetry */
+/* 
+  JDT Water Tank Controller - Mobile Application Script
+  Includes Theme Switcher, Real-Time WebSockets Telemetry, & Settings
+*/
 
 document.addEventListener('DOMContentLoaded', () => {
+  // DOM Elements
+  const htmlDoc = document.documentElement;
+  const btnThemeToggle = document.getElementById('btn-theme-toggle');
+  const iconTheme = document.getElementById('icon-theme');
+  const labelTheme = document.getElementById('label-theme');
 
-  // ── DOM Elements ──
-  const connChip   = document.getElementById('conn-chip');
-  const connDot    = document.getElementById('conn-dot');
-  const connLabel  = document.getElementById('conn-label');
-  const errorBanner = document.getElementById('error-banner');
+  const connectionStatus = document.getElementById('connection-status');
+  const connectionLabel = document.getElementById('connection-label');
 
-  const distanceNum  = document.getElementById('distance-num');
-  const distanceSub  = document.getElementById('distance-sub');
-  const water        = document.getElementById('water');
-  const beam         = document.getElementById('beam');
-  const valLevelPct  = document.getElementById('val-level-pct');
+  const valLevelPct = document.getElementById('val-level-pct');
+  const valDistanceCm = document.getElementById('val-distance-cm');
+  const valWaterCm = document.getElementById('val-water-cm');
   const valWaterStatus = document.getElementById('val-water-status');
 
-  const valWaterCm = document.getElementById('val-water-cm');
-  const valAirGap  = document.getElementById('val-air-gap');
-  const valVolume  = document.getElementById('val-volume');
-  const valRssi    = document.getElementById('val-rssi');
+  const waterFill = document.getElementById('water-fill');
+  const sensorBeam = document.getElementById('sensor-beam');
 
-  const btnAuto    = document.getElementById('btn-auto');
-  const btnManual  = document.getElementById('btn-manual');
-  const pumpDesc   = document.getElementById('pump-desc');
-  const pumpDot    = document.getElementById('pump-dot');
-  const pumpStateText  = document.getElementById('pump-state-text');
-  const pumpRelayText  = document.getElementById('pump-relay-text');
-  const btnPump        = document.getElementById('btn-pump');
-  const btnPumpLabel   = document.getElementById('btn-pump-label');
+  const valWifiRssi = document.getElementById('val-wifi-rssi');
+  const valVolumeLiters = document.getElementById('val-volume-liters');
 
-  const btnTheme       = document.getElementById('btn-theme');
-  const btnSettings    = document.getElementById('btn-settings');
-  const modalOverlay   = document.getElementById('modal-overlay');
-  const btnCloseModal  = document.getElementById('btn-close-modal');
-  const btnSaveCfg     = document.getElementById('btn-save-cfg');
+  const btnModeAuto = document.getElementById('btn-mode-auto');
+  const btnModeManual = document.getElementById('btn-mode-manual');
+  const pumpModeDesc = document.getElementById('pump-mode-desc');
 
-  const cfgTankDepth     = document.getElementById('cfg-tank-depth');
-  const cfgSensorOffset  = document.getElementById('cfg-sensor-offset');
-  const cfgAutoOn        = document.getElementById('cfg-auto-on');
-  const cfgAutoOnVal     = document.getElementById('cfg-auto-on-val');
-  const cfgAutoOff       = document.getElementById('cfg-auto-off');
-  const cfgAutoOffVal    = document.getElementById('cfg-auto-off-val');
-  const cfgWifiSsid      = document.getElementById('cfg-wifi-ssid');
-  const cfgWifiPass      = document.getElementById('cfg-wifi-pass');
+  const pumpIndicator = document.getElementById('pump-indicator');
+  const lblPumpState = document.getElementById('lbl-pump-state');
+  const lblPumpSub = document.getElementById('lbl-pump-sub');
+  const btnTogglePump = document.getElementById('btn-toggle-pump');
+  const lblBtnPump = document.getElementById('lbl-btn-pump');
 
-  // ── Application State ──
+  // Modal Elements
+  const settingsModal = document.getElementById('settings-modal');
+  const btnOpenSettings = document.getElementById('btn-open-settings');
+  const btnCloseSettings = document.getElementById('btn-close-settings');
+  const btnSaveSettings = document.getElementById('btn-save-settings');
+
+  const inputTankDepth = document.getElementById('input-tank-depth');
+  const inputSensorOffset = document.getElementById('input-sensor-offset');
+  const inputAutoMin = document.getElementById('input-auto-min');
+  const valAutoMin = document.getElementById('val-auto-min');
+  const inputAutoMax = document.getElementById('input-auto-max');
+  const valAutoMax = document.getElementById('val-auto-max');
+  const inputWifiSsid = document.getElementById('input-wifi-ssid');
+  const inputWifiPass = document.getElementById('input-wifi-pass');
+
+  // State
   let state = {
     connected: false,
-    sensorError: false,
-    distanceCm: 0,
+    apMode: false,
     waterLevelPct: 0,
+    distanceCm: 0,
     waterDepthCm: 0,
     tankDepthCm: 100,
     sensorOffsetCm: 20,
@@ -59,57 +63,75 @@ document.addEventListener('DOMContentLoaded', () => {
     pumpMode: 'AUTO',
     rssi: -60,
     autoMinPct: 20,
-    autoMaxPct: 95
+    autoMaxPct: 95,
+    sensorError: false
   };
 
-  // ── Theme Toggle ──
-  const savedTheme = localStorage.getItem('aq-theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', savedTheme);
+  // ── 1. Theme Toggle (Light / Dark Mode) ──
+  const savedTheme = localStorage.getItem('jdt_theme') || 'dark';
+  applyTheme(savedTheme);
 
-  btnTheme.addEventListener('click', () => {
-    const current = document.documentElement.getAttribute('data-theme');
-    const next = current === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('aq-theme', next);
-    // Re-render Lucide icons for theme switch
+  btnThemeToggle.addEventListener('click', () => {
+    const currentTheme = htmlDoc.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    applyTheme(newTheme);
+    localStorage.setItem('jdt_theme', newTheme);
+  });
+
+  function applyTheme(theme) {
+    htmlDoc.setAttribute('data-theme', theme);
+    if (theme === 'light') {
+      labelTheme.textContent = 'Light';
+      if (iconTheme) iconTheme.setAttribute('data-lucide', 'sun');
+    } else {
+      labelTheme.textContent = 'Dark';
+      if (iconTheme) iconTheme.setAttribute('data-lucide', 'moon');
+    }
     if (window.lucide) lucide.createIcons();
+  }
+
+  // ── 2. Settings Modal Event Handlers ──
+  inputAutoMin.addEventListener('input', (e) => {
+    valAutoMin.textContent = `${e.target.value}%`;
   });
 
-  // ── Settings Modal ──
-  btnSettings.addEventListener('click', () => {
-    cfgTankDepth.value = state.tankDepthCm;
-    cfgSensorOffset.value = state.sensorOffsetCm;
-    cfgAutoOn.value = state.autoMinPct;
-    cfgAutoOnVal.textContent = state.autoMinPct + '%';
-    cfgAutoOff.value = state.autoMaxPct;
-    cfgAutoOffVal.textContent = state.autoMaxPct + '%';
-    modalOverlay.classList.add('open');
+  inputAutoMax.addEventListener('input', (e) => {
+    valAutoMax.textContent = `${e.target.value}%`;
   });
 
-  btnCloseModal.addEventListener('click', () => {
-    modalOverlay.classList.remove('open');
+  btnOpenSettings.addEventListener('click', () => {
+    inputTankDepth.value = state.tankDepthCm;
+    inputSensorOffset.value = state.sensorOffsetCm;
+    inputAutoMin.value = state.autoMinPct;
+    valAutoMin.textContent = `${state.autoMinPct}%`;
+    inputAutoMax.value = state.autoMaxPct;
+    valAutoMax.textContent = `${state.autoMaxPct}%`;
+    
+    settingsModal.classList.add('open');
   });
 
-  modalOverlay.addEventListener('click', (e) => {
-    if (e.target === modalOverlay) modalOverlay.classList.remove('open');
+  btnCloseSettings.addEventListener('click', () => {
+    settingsModal.classList.remove('open');
   });
 
-  cfgAutoOn.addEventListener('input', (e) => {
-    cfgAutoOnVal.textContent = e.target.value + '%';
-  });
-  cfgAutoOff.addEventListener('input', (e) => {
-    cfgAutoOffVal.textContent = e.target.value + '%';
+  // ── 3. Mode Switcher & Pump Action ──
+  btnModeAuto.addEventListener('click', () => setPumpMode('AUTO'));
+  btnModeManual.addEventListener('click', () => setPumpMode('MANUAL'));
+
+  btnTogglePump.addEventListener('click', () => {
+    if (state.pumpMode !== 'MANUAL') return;
+    const nextState = !state.pumpState;
+    sendPumpCommand(nextState, 'MANUAL');
   });
 
-  // ── Save Settings ──
-  btnSaveCfg.addEventListener('click', async () => {
+  btnSaveSettings.addEventListener('click', async () => {
     const payload = {
-      tankDepthCm: parseFloat(cfgTankDepth.value) || 100,
-      sensorOffsetCm: parseFloat(cfgSensorOffset.value) || 20,
-      autoMinPct: parseInt(cfgAutoOn.value) || 20,
-      autoMaxPct: parseInt(cfgAutoOff.value) || 95,
-      ssid: cfgWifiSsid.value.trim(),
-      pass: cfgWifiPass.value.trim()
+      tankDepthCm: parseFloat(inputTankDepth.value) || 100,
+      sensorOffsetCm: parseFloat(inputSensorOffset.value) || 20,
+      autoMinPct: parseInt(inputAutoMin.value) || 20,
+      autoMaxPct: parseInt(inputAutoMax.value) || 95,
+      ssid: inputWifiSsid.value.trim(),
+      pass: inputWifiPass.value.trim()
     };
 
     try {
@@ -119,28 +141,17 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify(payload)
       });
       if (res.ok) {
-        alert('✅ Settings saved to ESP32!');
-        modalOverlay.classList.remove('open');
-        fetchTelemetry();
+        alert('Settings saved successfully!');
+        settingsModal.classList.remove('open');
       }
-    } catch {
+    } catch (err) {
       state.tankDepthCm = payload.tankDepthCm;
       state.sensorOffsetCm = payload.sensorOffsetCm;
       state.autoMinPct = payload.autoMinPct;
       state.autoMaxPct = payload.autoMaxPct;
       updateUI();
-      modalOverlay.classList.remove('open');
+      settingsModal.classList.remove('open');
     }
-  });
-
-  // ── Mode Switchers ──
-  btnAuto.addEventListener('click', () => setPumpMode('AUTO'));
-  btnManual.addEventListener('click', () => setPumpMode('MANUAL'));
-
-  // ── Pump Toggle ──
-  btnPump.addEventListener('click', () => {
-    if (state.pumpMode !== 'MANUAL') return;
-    sendPumpCommand(!state.pumpState, 'MANUAL');
   });
 
   function setPumpMode(mode) {
@@ -148,183 +159,153 @@ document.addEventListener('DOMContentLoaded', () => {
     sendPumpCommand(state.pumpState, mode);
   }
 
-  async function sendPumpCommand(pumpVal, modeVal) {
-    state.pumpState = pumpVal;
+  function sendPumpCommand(pumpStateVal, modeVal) {
+    state.pumpState = pumpStateVal;
     state.pumpMode = modeVal;
     updateUI();
-    try {
-      await fetch('/api/pump', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: pumpVal, mode: modeVal })
-      });
-    } catch { /* offline mode */ }
-  }
 
-  // ── Telemetry Fetch ──
-  async function fetchTelemetry() {
-    try {
-      const res = await fetch('/api/telemetry');
-      if (res.ok) {
-        const d = await res.json();
-        state.connected = true;
-        state.sensorError = d.sensorError || false;
-        state.distanceCm = d.distanceCm;
-        state.waterLevelPct = d.waterLevelPct;
-        state.waterDepthCm = d.waterDepthCm;
-        state.tankDepthCm = d.tankDepthCm || 100;
-        state.sensorOffsetCm = d.sensorOffsetCm || 20;
-        state.volumeLiters = d.volumeLiters;
-        state.pumpState = d.pumpState;
-        state.pumpMode = d.pumpMode || 'AUTO';
-        state.rssi = d.rssi;
-        state.autoMinPct = d.autoMinPct || 20;
-        state.autoMaxPct = d.autoMaxPct || 95;
-      }
-    } catch {
-      if (!state.connected) runDemo();
-    }
-    updateUI();
-  }
-
-  // ── Update UI ──
-  function updateUI() {
-    // Connection
-    if (state.connected) {
-      connChip.className = 'conn-chip online';
-      connLabel.textContent = 'ONLINE';
-    } else {
-      connChip.className = 'conn-chip demo';
-      connLabel.textContent = 'DEMO';
-    }
-
-    // Sensor error
-    const hasError = state.sensorError || state.distanceCm === -1;
-    errorBanner.style.display = hasError ? 'flex' : 'none';
-
-    // Distance hero
-    if (hasError) {
-      distanceNum.textContent = '--';
-      distanceSub.textContent = 'Sensor Error';
-      distanceSub.style.color = 'var(--red)';
-    } else {
-      distanceNum.textContent = (typeof state.distanceCm === 'number') 
-        ? state.distanceCm.toFixed(1) 
-        : parseFloat(state.distanceCm || 0).toFixed(1);
-      
-      if (state.distanceCm <= 20) {
-        distanceSub.textContent = '🔝 Very Close (Full)';
-        distanceSub.style.color = 'var(--green)';
-      } else if (state.distanceCm > 80) {
-        distanceSub.textContent = '⚠️ Low Water Level';
-        distanceSub.style.color = 'var(--amber)';
-      } else {
-        distanceSub.textContent = '📏 Measuring Live';
-        distanceSub.style.color = 'var(--text-3)';
-      }
-    }
-
-    // Water level %
-    const pct = Math.min(100, Math.max(0, Math.round(state.waterLevelPct)));
-    valLevelPct.textContent = pct + '%';
-    water.style.height = pct + '%';
-    beam.style.height = (100 - pct) + '%';
-
-    // Status label
-    if (hasError) {
-      valWaterStatus.textContent = '⚠️ ERROR';
-      valWaterStatus.style.color = 'var(--red)';
-    } else if (pct >= 90) {
-      valWaterStatus.textContent = '✅ Full';
-      valWaterStatus.style.color = 'var(--green)';
-    } else if (pct < 20) {
-      valWaterStatus.textContent = '⚠️ Low';
-      valWaterStatus.style.color = 'var(--red)';
-    } else {
-      valWaterStatus.textContent = '💧 Normal';
-      valWaterStatus.style.color = 'var(--cyan)';
-    }
-
-    // Metric cards
-    const waterCm = hasError ? '--' : (state.waterDepthCm || Math.round((pct / 100) * state.tankDepthCm));
-    const airGap  = hasError ? '--' : (state.distanceCm || (state.tankDepthCm - Math.round((pct / 100) * state.tankDepthCm)));
-    const volume  = hasError ? '--' : (state.volumeLiters || Math.round(pct * 10));
-
-    valWaterCm.innerHTML = waterCm + ' <small>cm</small>';
-    valAirGap.innerHTML  = (typeof airGap === 'number' ? airGap.toFixed(1) : airGap) + ' <small>cm</small>';
-    valVolume.innerHTML   = volume + ' <small>L</small>';
-    valRssi.innerHTML     = state.rssi + ' <small>dBm</small>';
-
-    // Pump mode
-    if (state.pumpMode === 'AUTO') {
-      btnAuto.classList.add('active');
-      btnManual.classList.remove('active');
-      pumpDesc.textContent = `AUTO: ON at ≤${state.autoMinPct}%, OFF at ≥${state.autoMaxPct}%`;
-      btnPump.disabled = true;
-    } else {
-      btnAuto.classList.remove('active');
-      btnManual.classList.add('active');
-      pumpDesc.textContent = 'MANUAL: Direct motor control below.';
-      btnPump.disabled = false;
-    }
-
-    // Pump state
-    if (state.pumpState) {
-      pumpDot.classList.add('on');
-      pumpStateText.textContent = 'PUMP RUNNING';
-      pumpStateText.style.color = 'var(--green)';
-      pumpRelayText.textContent = 'Relay: ACTIVE (HIGH)';
-      btnPump.classList.add('on');
-      btnPumpLabel.textContent = 'STOP';
-    } else {
-      pumpDot.classList.remove('on');
-      pumpStateText.textContent = 'PUMP OFF';
-      pumpStateText.style.color = 'var(--text-1)';
-      pumpRelayText.textContent = 'Relay: IDLE (LOW)';
-      btnPump.classList.remove('on');
-      btnPumpLabel.textContent = 'START';
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'control',
+        pumpOn: pumpStateVal,
+        mode: modeVal
+      }));
     }
   }
 
-  // ── Demo Simulation ──
-  let simPct = 45;
-  let simDir = 1;
-  function runDemo() {
-    simPct += simDir * 0.5;
-    if (simPct >= 95) simDir = -1;
-    if (simPct <= 15) simDir = 1;
-    state.waterLevelPct = simPct;
-    state.tankDepthCm = 100;
-    state.waterDepthCm = Math.round(simPct);
-    state.distanceCm = 100 - state.waterDepthCm;
-    state.volumeLiters = Math.round(simPct * 10);
-    state.rssi = -58;
-    if (state.pumpMode === 'AUTO') {
-      if (simPct <= state.autoMinPct) state.pumpState = true;
-      if (simPct >= state.autoMaxPct) state.pumpState = false;
-    }
-  }
+  // ── 4. WebSockets Telemetry Client ──
+  let ws;
+  function connectWebSocket() {
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${location.host}/ws`;
 
-  // ── Expose for WebSocket bridge (esp32-ws.js) ──
-  window.AquaSense = {
-    updateFromWS: function(data) {
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
       state.connected = true;
-      state.sensorError = data.sensorError || false;
-      state.distanceCm = data.distanceCm;
-      state.rssi = data.rssi || state.rssi;
-
-      // Calculate water level from distance
-      const usableDepth = state.tankDepthCm - state.sensorOffsetCm;
-      const waterDepth = usableDepth - (data.distanceCm - state.sensorOffsetCm);
-      state.waterDepthCm = Math.max(0, Math.round(waterDepth));
-      state.waterLevelPct = Math.max(0, Math.min(100, (waterDepth / usableDepth) * 100));
-      state.volumeLiters = Math.round(state.waterLevelPct * 10);
-
       updateUI();
-    }
-  };
+    };
 
-  // ── Start ──
-  fetchTelemetry();
-  setInterval(fetchTelemetry, 1000);
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'telemetry' || data.distanceCm !== undefined) {
+          state.connected = true;
+          state.distanceCm = data.distanceCm;
+          state.sensorError = data.sensorError || (data.distanceCm === -1);
+          if (data.rssi !== undefined) state.rssi = data.rssi;
+          updateUI();
+        }
+      } catch (e) {}
+    };
+
+    ws.onclose = () => {
+      state.connected = false;
+      updateUI();
+      setTimeout(connectWebSocket, 3000);
+    };
+
+    ws.onerror = () => {
+      state.connected = false;
+      updateUI();
+    };
+  }
+
+  // ── 5. UI Update Engine ──
+  function updateUI() {
+    // Connection Status Badge
+    if (state.connected) {
+      connectionStatus.className = 'status-badge online';
+      connectionLabel.textContent = 'ONLINE';
+    } else {
+      connectionStatus.className = 'status-badge offline';
+      connectionLabel.textContent = 'OFFLINE';
+    }
+
+    // Distance calculation
+    const rawDist = state.distanceCm;
+    const isError = state.sensorError || rawDist === -1;
+
+    if (isError) {
+      valDistanceCm.textContent = '--';
+      valWaterCm.textContent = '--';
+      valLevelPct.textContent = '0';
+      waterFill.style.height = '0%';
+      sensorBeam.style.height = '100%';
+      valWaterStatus.className = 'status-tag warning';
+      valWaterStatus.textContent = '⚠️ SENSOR DISCONNECTED';
+      valVolumeLiters.textContent = '-- L';
+    } else {
+      // Valid distance
+      const displayDist = rawDist < 20 ? 20 : rawDist;
+      valDistanceCm.textContent = displayDist.toFixed(1);
+
+      // Usable depth calculation
+      const usableDepth = state.tankDepthCm - state.sensorOffsetCm;
+      const waterDepth = Math.max(0, usableDepth - (displayDist - state.sensorOffsetCm));
+      valWaterCm.textContent = waterDepth.toFixed(1);
+
+      // Percentage calculation
+      let pct = Math.round((waterDepth / usableDepth) * 100);
+      pct = Math.min(100, Math.max(0, pct));
+      if (displayDist <= 20) pct = 100;
+
+      valLevelPct.textContent = `${pct}`;
+      waterFill.style.height = `${pct}%`;
+      sensorBeam.style.height = `${100 - pct}%`;
+
+      // Est Volume (assuming 1000L tank capacity)
+      const estLiters = Math.round((pct / 100) * 1000);
+      valVolumeLiters.textContent = `${estLiters} L`;
+
+      // Status Tag
+      if (pct < 20) {
+        valWaterStatus.className = 'status-tag warning';
+        valWaterStatus.textContent = '⚠️ Water Level Low';
+      } else if (pct >= 90) {
+        valWaterStatus.className = 'status-tag success';
+        valWaterStatus.textContent = '✅ Tank Full';
+      } else {
+        valWaterStatus.className = 'status-tag normal';
+        valWaterStatus.textContent = '💧 Level Normal';
+      }
+    }
+
+    // WiFi RSSI
+    valWifiRssi.textContent = `${state.rssi} dBm`;
+
+    // Pump Mode Buttons
+    if (state.pumpMode === 'AUTO') {
+      btnModeAuto.classList.add('active');
+      btnModeManual.classList.remove('active');
+      pumpModeDesc.textContent = `AUTOMATIC: Turns ON at ≤${state.autoMinPct}% and OFF at ≥${state.autoMaxPct}%.`;
+      btnTogglePump.disabled = true;
+    } else {
+      btnModeAuto.classList.remove('active');
+      btnModeManual.classList.add('active');
+      pumpModeDesc.textContent = 'MANUAL OVERRIDE: Directly control motor power below.';
+      btnTogglePump.disabled = false;
+    }
+
+    // Pump State Action
+    if (state.pumpState) {
+      pumpIndicator.classList.add('active');
+      lblPumpState.textContent = 'PUMP RUNNING';
+      lblPumpState.style.color = 'var(--accent-green)';
+      lblPumpSub.textContent = 'Relay Status: ACTIVE (HIGH)';
+      btnTogglePump.classList.add('on');
+      lblBtnPump.textContent = 'STOP PUMP';
+    } else {
+      pumpIndicator.classList.remove('active');
+      lblPumpState.textContent = 'PUMP OFF';
+      lblPumpState.style.color = 'var(--text-main)';
+      lblPumpSub.textContent = 'Relay Status: IDLE (LOW)';
+      btnTogglePump.classList.remove('on');
+      lblBtnPump.textContent = 'START PUMP';
+    }
+  }
+
+  // Start WebSockets
+  connectWebSocket();
+  updateUI();
 });
