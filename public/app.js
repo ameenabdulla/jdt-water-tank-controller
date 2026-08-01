@@ -1,6 +1,6 @@
 /*
-  JDT Water Tank Controller - Application Script for Image 2 Design
-  Supports WebSockets, Light/Dark Theme Switcher, & Real-time Telemetry
+  JDT Water Tank Controller - Ultimate Application Script
+  Includes Theme Switcher, WebSockets Telemetry, & Large Metrics
 */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -16,13 +16,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const waterFill = document.getElementById('water-fill');
   const levelPercent = document.getElementById('level-percent');
   const distanceCm = document.getElementById('distance-cm');
-  const tankDepthDisplay = document.getElementById('tank-depth-display');
+  const waterDepthCm = document.getElementById('water-depth-cm');
   const rssiVal = document.getElementById('rssi-val');
+  const waterStatusBadge = document.getElementById('water-status-badge');
   const calibrateDistance = document.getElementById('calibrate-distance');
 
   const pumpModeSub = document.getElementById('pump-mode-sub');
   const btnModeAuto = document.getElementById('btn-mode-auto');
   const btnModeManual = document.getElementById('btn-mode-manual');
+  const pumpRelayText = document.getElementById('pump-relay-text');
   const pumpStateBadge = document.getElementById('pump-state-badge');
   const pumpToggleInput = document.getElementById('pump-toggle-input');
 
@@ -44,10 +46,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // State
   let state = {
     connected: false,
-    distanceCm: 33.5,
+    distanceCm: 28.8,
     tankDepthCm: 100,
     sensorOffsetCm: 20,
-    rssi: -34,
+    rssi: -37,
     pumpState: false,
     pumpMode: 'AUTO',
     autoMinPct: 20,
@@ -185,62 +187,79 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── 5. UI Update Engine ──
   function updateUI() {
-    // Status Pill
+    // Status Badge
     if (state.connected) {
       statusPill.className = 'status-pill online';
-      statusText.textContent = 'ESP32 ONLINE';
+      statusText.textContent = 'ONLINE';
     } else {
       statusPill.className = 'status-pill';
-      statusText.textContent = 'DISCONNECTED';
+      statusText.textContent = 'OFFLINE';
     }
 
     const dist = state.distanceCm;
     const isError = state.sensorError || dist === -1;
 
     if (isError) {
-      distanceCm.innerHTML = `-- <small>cm</small>`;
+      distanceCm.textContent = `--`;
+      waterDepthCm.textContent = `--`;
       calibrateDistance.textContent = `-- cm`;
-      levelPercent.innerHTML = `0.0<small>%</small>`;
+      levelPercent.textContent = `0.0`;
       waterFill.style.height = `0%`;
+      waterStatusBadge.className = 'badge warning';
+      waterStatusBadge.textContent = '⚠️ SENSOR ERROR';
     } else {
       const displayDist = dist < 20 ? 20 : dist;
-      distanceCm.innerHTML = `${displayDist.toFixed(1)} <small>cm</small>`;
+      distanceCm.textContent = displayDist.toFixed(1);
       calibrateDistance.textContent = `${displayDist.toFixed(1)} cm`;
 
-      // Level calculation
+      // Level & depth calculation
       const usableDepth = state.tankDepthCm - state.sensorOffsetCm;
-      const waterDepth  = Math.max(0, usableDepth - (displayDist - state.sensorOffsetCm));
-      let pct = ((waterDepth / usableDepth) * 100).toFixed(1);
+      const depth = Math.max(0, usableDepth - (displayDist - state.sensorOffsetCm));
+      waterDepthCm.textContent = depth.toFixed(1);
+
+      let pct = ((depth / usableDepth) * 100).toFixed(1);
       if (displayDist <= 20) pct = '100.0';
 
-      levelPercent.innerHTML = `${pct}<small>%</small>`;
+      levelPercent.textContent = `${pct}`;
       waterFill.style.height = `${pct}%`;
+
+      if (parseFloat(pct) >= 90) {
+        waterStatusBadge.className = 'badge success';
+        waterStatusBadge.textContent = '✅ Tank Full';
+      } else if (parseFloat(pct) <= 20) {
+        waterStatusBadge.className = 'badge warning';
+        waterStatusBadge.textContent = '⚠️ Level Low';
+      } else {
+        waterStatusBadge.className = 'badge success';
+        waterStatusBadge.textContent = '💧 Level Normal';
+      }
     }
 
-    tankDepthDisplay.innerHTML = `${state.tankDepthCm} <small>cm</small>`;
-    rssiVal.innerHTML = `${state.rssi} <small>dBm</small>`;
+    rssiVal.textContent = `${state.rssi}`;
 
-    // Mode Selector
+    // Mode Switcher
     if (state.pumpMode === 'AUTO') {
       btnModeAuto.classList.add('active');
       btnModeManual.classList.remove('active');
-      pumpModeSub.textContent = 'Mode: AUTO (System Controls Motor)';
+      pumpModeSub.textContent = 'Mode: AUTOMATIC (System Controls Motor)';
       pumpToggleInput.disabled = true;
     } else {
       btnModeAuto.classList.remove('active');
       btnModeManual.classList.add('active');
-      pumpModeSub.textContent = 'Mode: MANUAL (User Direct Override)';
+      pumpModeSub.textContent = 'Mode: MANUAL OVERRIDE (User Direct Control)';
       pumpToggleInput.disabled = false;
     }
 
-    // Pump State Toggle
+    // Pump Toggle
     pumpToggleInput.checked = state.pumpState;
     if (state.pumpState) {
       pumpStateBadge.className = 'pump-state-badge on';
       pumpStateBadge.textContent = 'ON';
+      pumpRelayText.textContent = 'Relay: ACTIVE (ON)';
     } else {
       pumpStateBadge.className = 'pump-state-badge off';
       pumpStateBadge.textContent = 'OFF';
+      pumpRelayText.textContent = 'Relay: IDLE (OFF)';
     }
   }
 
