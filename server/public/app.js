@@ -279,18 +279,36 @@
   }
 
   // ═══════════════════════
-  //  WEBSOCKET
+  //  WEBSOCKET & HEARTBEAT
   // ═══════════════════════
   let reconTimer;
+  let lastDeviceHeartbeat = 0;
+
+  // Periodic device online check (4.5s timeout)
+  setInterval(() => {
+    if (live.connected && Date.now() - lastDeviceHeartbeat > 4500) {
+      live.connected = false;
+      render();
+    }
+  }, 1000);
+
   function connectWS() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(proto + '//' + location.host + '/ws');
-    ws.onopen = () => { live.connected = true; render(); };
+    ws.onopen = () => {
+      // Server socket connected; awaiting device telemetry heartbeat
+      render();
+    };
     ws.onmessage = (ev) => {
       try {
         const d = JSON.parse(ev.data);
         if (d.type === 'telemetry' || d.distanceCm !== undefined) {
-          live.connected = true;
+          if (d.deviceOnline === false) {
+            live.connected = false;
+          } else {
+            lastDeviceHeartbeat = Date.now();
+            live.connected = true;
+          }
           live.dist = d.distanceCm;
           live.err = d.sensorError || d.distanceCm === -1;
           if (d.rssi !== undefined) live.rssi = d.rssi;
@@ -314,11 +332,11 @@
       $.statusText.textContent = 'DEVICE ONLINE';
     } else {
       $.statusPill.className = 'status-pill offline';
-      $.statusText.textContent = 'OFFLINE';
+      $.statusText.textContent = 'DEVICE OFFLINE';
     }
 
     // Calc
-    const isErr = live.err || live.dist <= 0;
+    const isErr = !live.connected || live.err || live.dist <= 0;
     const tankH = cfg.tankH;
     const off = cfg.offset;
     const usable = tankH - off;
@@ -331,12 +349,15 @@
     }
 
     // Tank
-    $.water.style.height = pct.toFixed(1) + '%';
-    $.tankPct.textContent = pct.toFixed(1) + '%';
+    $.water.style.height = isErr ? '0%' : (pct.toFixed(1) + '%');
+    $.tankPct.textContent = isErr ? '0%' : (pct.toFixed(1) + '%');
 
     // Hero Status Badge
     if ($.heroStatusBadge) {
-      if (isErr) {
+      if (!live.connected) {
+        $.heroStatusBadge.textContent = '🔌 Device Offline';
+        $.heroStatusBadge.className = 'hero-status-badge warn';
+      } else if (live.err) {
         $.heroStatusBadge.textContent = '⚠️ Checking Sensor...';
         $.heroStatusBadge.className = 'hero-status-badge warn';
       } else if (pct >= 90) {
@@ -353,7 +374,7 @@
 
     // Hero
     $.lvlNum.textContent = isErr ? '--' : pct.toFixed(1);
-    $.lvlBar.style.width = pct.toFixed(1) + '%';
+    $.lvlBar.style.width = isErr ? '0%' : (pct.toFixed(1) + '%');
 
     // Metrics
     $.mDist.textContent = isErr ? '--' : dDisp.toFixed(1);
@@ -365,7 +386,7 @@
       const r = live.rssi;
       $.rssiQ.textContent = r >= -55 ? 'Strong Signal' : r >= -70 ? 'Good Signal' : 'Weak Signal';
     } else {
-      $.rssiQ.textContent = 'Disconnected';
+      $.rssiQ.textContent = 'Device Offline';
     }
 
     // Live dist in modal

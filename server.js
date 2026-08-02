@@ -64,6 +64,7 @@ const wss = new WebSocket.Server({ noServer: true });
 
 const clients = new Set();
 let lastTelemetry = null;
+let lastDeviceTime = 0;
 
 function broadcast(data, originWs = null) {
   clients.forEach(ws => {
@@ -88,9 +89,16 @@ wss.on('connection', (ws, req) => {
   clients.add(ws);
   console.log(`[WS] Client Connected (${clients.size} total)`);
 
-  // Send last cached telemetry if available
+  // Send last cached telemetry if device was active in the last 6 seconds
+  const isDeviceActive = (Date.now() - lastDeviceTime) < 6000;
   if (lastTelemetry) {
-    ws.send(lastTelemetry);
+    try {
+      const obj = JSON.parse(lastTelemetry);
+      obj.deviceOnline = isDeviceActive;
+      ws.send(JSON.stringify(obj));
+    } catch (_) {
+      ws.send(lastTelemetry);
+    }
   }
 
   ws.on('message', (raw) => {
@@ -98,11 +106,15 @@ wss.on('connection', (ws, req) => {
     try {
       const msg = JSON.parse(str);
       if (msg.type === 'telemetry' || msg.distanceCm !== undefined) {
-        lastTelemetry = str;
+        lastDeviceTime = Date.now();
+        msg.deviceOnline = true;
+        lastTelemetry = JSON.stringify(msg);
+        broadcast(JSON.stringify(msg), ws);
+        return;
       }
     } catch (_) {}
     
-    // Broadcast message to all other connected clients (ESP32 <-> Browser)
+    // Broadcast other control messages to all clients
     broadcast(str, ws);
   });
 
