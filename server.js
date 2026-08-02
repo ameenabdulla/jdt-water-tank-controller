@@ -1,6 +1,6 @@
 /**
  * JDT Water Tank Controller — Render.com WebSocket Relay Server
- * Bridges ESP32 hardware and web browsers seamlessly.
+ * Bridges ESP32 hardware and web browsers seamlessly with instant disconnect detection.
  */
 
 'use strict';
@@ -63,13 +63,14 @@ const httpServer = http.createServer((req, res) => {
 const wss = new WebSocket.Server({ noServer: true });
 
 const clients = new Set();
+let deviceSocket = null;
 let lastTelemetry = null;
 let lastDeviceTime = 0;
 
 function broadcast(data, originWs = null) {
-  clients.forEach(ws => {
-    if (ws !== originWs && ws.readyState === WebSocket.OPEN) {
-      ws.send(data);
+  clients.forEach(client => {
+    if (client !== originWs && client.readyState === WebSocket.OPEN) {
+      client.send(data);
     }
   });
 }
@@ -89,16 +90,21 @@ wss.on('connection', (ws, req) => {
   clients.add(ws);
   console.log(`[WS] Client Connected (${clients.size} total)`);
 
-  // Send last cached telemetry if device was active in the last 6 seconds
-  const isDeviceActive = (Date.now() - lastDeviceTime) < 6000;
+  // Check if hardware ESP32 is currently connected and active (telemetry within last 4s)
+  const isDeviceActive = (deviceSocket !== null && deviceSocket.readyState === WebSocket.OPEN && (Date.now() - lastDeviceTime < 4000));
+
   if (lastTelemetry) {
     try {
       const obj = JSON.parse(lastTelemetry);
       obj.deviceOnline = isDeviceActive;
+      if (!isDeviceActive) obj.distanceCm = -1;
       ws.send(JSON.stringify(obj));
     } catch (_) {
       ws.send(lastTelemetry);
     }
+  } else {
+    // Send initial status to new browser if no telemetry yet
+    ws.send(JSON.stringify({ type: 'telemetry', deviceOnline: isDeviceActive, distanceCm: -1 }));
   }
 
   ws.on('message', (raw) => {
@@ -106,25 +112,66 @@ wss.on('connection', (ws, req) => {
     try {
       const msg = JSON.parse(str);
       if (msg.type === 'telemetry' || msg.distanceCm !== undefined) {
+        // Tag this WebSocket as the hardware ESP32 device
+        ws.isDevice = true;
+        deviceSocket = ws;
         lastDeviceTime = Date.now();
         msg.deviceOnline = true;
+
         lastTelemetry = JSON.stringify(msg);
         broadcast(JSON.stringify(msg), ws);
         return;
       }
     } catch (_) {}
     
-    // Broadcast other control messages to all clients
+    // Relay control or config messages to all connected sockets
     broadcast(str, ws);
   });
 
   ws.on('close', () => {
     clients.delete(ws);
     console.log(`[WS] Client Disconnected (${clients.size} remaining)`);
+
+    // If the disconnected client was the ESP32 hardware device
+    if (ws === deviceSocket || ws.isDevice) {
+      console.log('[WS] ⚠️ HARDWARE ESP32 DEVICE DISCONNECTED');
+      deviceSocket = null;
+      lastDeviceTime = 0;
+
+      const offlinePayload = JSON.stringify({
+        type: 'telemetry',
+        deviceOnline: false,
+        distanceCm: -1,
+        sensorError: true
+      });
+
+      lastTelemetry = offlinePayload;
+      // Immediately notify all connected web browsers
+      broadcast(offlinePayload);
+    }
   });
 
-  ws.on('error', (e) => console.error('[WS] Error:', e.message));
+  ws.on('error', (e) => {
+    console.error('[WS] Error:', e.message);
+  });
 });
+
+// Periodic sanity check: if ESP32 hasn't sent telemetry in 4 seconds, mark offline
+setInterval(() => {
+  if (deviceSocket && (Date.now() - lastDeviceTime > 4000)) {
+    console.log('[WS] ⚠️ Hardware ESP32 heartbeat timeout (4s silent)');
+    deviceSocket = null;
+    lastDeviceTime = 0;
+    const offlinePayload = JSON.stringify({
+      type: 'telemetry',
+      deviceOnline: false,
+      distanceCm: -1,
+      sensorError: true
+    });
+    lastTelemetry = offlinePayload;
+    broadcast(offlinePayload);
+  }
+}, 1000);
 
 // Keep Render.com free tier alive
 const SELF_URL = process.env.RENDER_EXTERNAL_URL;

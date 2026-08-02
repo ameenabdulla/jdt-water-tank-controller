@@ -284,33 +284,34 @@
   let reconTimer;
   let lastDeviceHeartbeat = 0;
 
-  // Periodic device online check (4.5s timeout)
+  // Fast device online check (3.5s timeout)
   setInterval(() => {
-    if (live.connected && Date.now() - lastDeviceHeartbeat > 4500) {
+    if (live.connected && (Date.now() - lastDeviceHeartbeat > 3500)) {
       live.connected = false;
       render();
     }
-  }, 1000);
+  }, 500);
 
   function connectWS() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(proto + '//' + location.host + '/ws');
     ws.onopen = () => {
-      // Server socket connected; awaiting device telemetry heartbeat
+      // Browser connected to cloud server; awaiting hardware device packet
       render();
     };
     ws.onmessage = (ev) => {
       try {
         const d = JSON.parse(ev.data);
         if (d.type === 'telemetry' || d.distanceCm !== undefined) {
-          if (d.deviceOnline === false) {
+          if (d.deviceOnline === false || d.distanceCm === -1) {
             live.connected = false;
+            lastDeviceHeartbeat = 0;
           } else {
             lastDeviceHeartbeat = Date.now();
             live.connected = true;
           }
           live.dist = d.distanceCm;
-          live.err = d.sensorError || d.distanceCm === -1;
+          live.err = d.sensorError || d.distanceCm === -1 || !live.connected;
           if (d.rssi !== undefined) live.rssi = d.rssi;
           if (d.pumpOn !== undefined) live.pumpOn = d.pumpOn;
           if (d.mode !== undefined) live.mode = d.mode;
@@ -318,7 +319,7 @@
         }
       } catch (e) {}
     };
-    ws.onclose = () => { live.connected = false; render(); clearTimeout(reconTimer); reconTimer = setTimeout(connectWS, 3000); };
+    ws.onclose = () => { live.connected = false; render(); clearTimeout(reconTimer); reconTimer = setTimeout(connectWS, 2000); };
     ws.onerror = () => { live.connected = false; render(); };
   }
 
