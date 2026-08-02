@@ -88,10 +88,9 @@ const char INDEX_HTML[] PROGMEM = R"html(
     <label>Device Name</label>
     <input type="text" name="name" placeholder="e.g. Rooftop Tank" required>
 
-    <label>Select WiFi Network</label>
-    <select id="wifiList" name="ssid" required>
-      <option value="">Scanning for networks...</option>
-    </select>
+    <label>WiFi Network Name (SSID)</label>
+    <input type="text" id="wifiInput" name="ssid" list="wifiOptions" placeholder="Select network or type SSID" autocomplete="off" required>
+    <datalist id="wifiOptions"></datalist>
     <div id="scanStatus" class="scan-status">⚡ Instant WiFi Scan...</div>
 
     <label>WiFi Password</label>
@@ -105,29 +104,28 @@ const char INDEX_HTML[] PROGMEM = R"html(
       fetch('/scan')
         .then(res => res.json())
         .then(data => {
-          const list = document.getElementById('wifiList');
+          const dl = document.getElementById('wifiOptions');
           const status = document.getElementById('scanStatus');
           if (data.status === 'scanning') {
             setTimeout(fetchWiFi, 500);
             return;
           }
-          list.innerHTML = '';
+          dl.innerHTML = '';
           if (!data.networks || data.networks.length === 0) {
-            list.innerHTML = '<option value="">No WiFi Found (Refreshing...)</option>';
-            status.innerHTML = '❌ No networks found';
-            setTimeout(fetchWiFi, 2000);
+            status.innerHTML = '⚠️ No networks found — type SSID manually above';
           } else {
-            status.innerHTML = '✅ Found ' + data.networks.length + ' WiFi networks';
+            status.innerHTML = '✅ Found ' + data.networks.length + ' networks (select or type manually)';
             data.networks.forEach(item => {
+              if (!item.ssid) return;
               const opt = document.createElement('option');
               opt.value = item.ssid;
-              opt.innerHTML = item.ssid + ' (' + item.rssi + ' dBm)';
-              list.appendChild(opt);
+              opt.label = item.ssid + ' (' + item.rssi + ' dBm)';
+              dl.appendChild(opt);
             });
           }
         })
         .catch(err => {
-          document.getElementById('scanStatus').innerHTML = '⚠️ Tap to select network';
+          document.getElementById('scanStatus').innerHTML = '💡 Type WiFi name manually above';
         });
     }
     fetchWiFi();
