@@ -76,7 +76,7 @@ wss.on('connection', (ws) => {
   console.log(`[WS] Connected  — total ${wss.clients.size}`);
 
   // Immediately tell the new browser the current device status
-  const isActive = deviceWs !== null && deviceWs.readyState === WebSocket.OPEN && (Date.now() - lastDevMs < 3000);
+  const isActive = deviceWs !== null && deviceWs.readyState === WebSocket.OPEN && (Date.now() - lastDevMs < 8000);
   if (isActive && lastRealData) {
     ws.send(lastRealData);   // Send the most recent real sensor data
   } else {
@@ -136,11 +136,11 @@ wss.on('connection', (ws) => {
 });
 
 // ─── Telemetry silence watchdog ───────────────────────────────────────────────
-// If device stops sending for >3s (e.g. power cut without clean TCP close),
+// If device stops sending for >8s (accounts for Render free-tier SSL jitter),
 // mark it offline and notify all browsers.
 setInterval(() => {
-  if (deviceWs !== null && (Date.now() - lastDevMs) > 3000) {
-    console.log('[WS] Device silent >3s → marking OFFLINE');
+  if (deviceWs !== null && (Date.now() - lastDevMs) > 8000) {
+    console.log('[WS] Device silent >8s → marking OFFLINE');
     try { deviceWs.terminate(); } catch (_) {}
     deviceWs   = null;
     lastDevMs  = 0;
