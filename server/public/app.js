@@ -56,6 +56,7 @@
     setupTheme();
     setupModal();
     setupPump();
+    setupPwa();
     render();
     connectWS();
   });
@@ -116,8 +117,40 @@
       sCredPass2: document.getElementById('s-cred-pass2'),
       btnHardReset: document.getElementById('btn-hard-reset'),
       wifiDatalist: document.getElementById('wifi-list-options'),
-      wifiScanStatus: document.getElementById('wifi-scan-status')
+      wifiScanStatus: document.getElementById('wifi-scan-status'),
+      btnInstallPwa: document.getElementById('btn-install-pwa')
     };
+  }
+
+  // ═══════════════════════
+  //  PWA MOBILE APP INSTALL
+  // ═══════════════════════
+  let deferredPrompt;
+
+  function setupPwa() {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      if ($.btnInstallPwa) {
+        $.btnInstallPwa.classList.remove('hidden');
+      }
+    });
+
+    if ($.btnInstallPwa) {
+      $.btnInstallPwa.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          $.btnInstallPwa.classList.add('hidden');
+        }
+        deferredPrompt = null;
+      });
+    }
   }
 
   // ═══════════════════════
