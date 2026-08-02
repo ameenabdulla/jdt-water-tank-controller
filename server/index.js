@@ -218,6 +218,16 @@ wss.on('connection', (ws) => {
         console.log(`[WS] Relayed WiFi config update for SSID: ${data.ssid}`);
       }
 
+      if (data.type === 'hardreset') {
+        const payload = JSON.stringify({ type: 'hardreset' });
+        wss.clients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN && client !== ws) {
+            client.send(payload);
+          }
+        });
+        console.log(`[WS] Relayed Hard Reset command to ESP32!`);
+      }
+
       // ESP32 telemetry via WebSocket
       if (data.type === 'telemetry') {
         tankState.lastSeen = Date.now();

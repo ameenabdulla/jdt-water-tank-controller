@@ -113,7 +113,8 @@
       sPass: document.getElementById('s-pass'),
       sUser: document.getElementById('s-user'),
       sCredPass: document.getElementById('s-cred-pass'),
-      sCredPass2: document.getElementById('s-cred-pass2')
+      sCredPass2: document.getElementById('s-cred-pass2'),
+      btnHardReset: document.getElementById('btn-hard-reset')
     };
   }
 
@@ -193,6 +194,20 @@
     $.sLow.addEventListener('input', () => { $.sLowV.textContent = $.sLow.value + '%'; });
     $.sHigh.addEventListener('input', () => { $.sHighV.textContent = $.sHigh.value + '%'; });
     $.btnApply.addEventListener('click', saveSettings);
+    if ($.btnHardReset) $.btnHardReset.addEventListener('click', handleHardReset);
+  }
+
+  function handleHardReset() {
+    if (!confirm('⚠️ Are you sure you want to HARD RESET the device?\n\nThis will erase saved WiFi credentials on the ESP32 and reboot it into AP Hotspot setup mode (JDT-Tank-Setup).')) {
+      return;
+    }
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'hardreset' }));
+      alert('🔄 Hard Reset command sent! The ESP32 is erasing WiFi settings and starting hotspot "JDT-Tank-Setup".');
+      closeModal();
+    } else {
+      alert('❌ Device is currently offline or disconnected.');
+    }
   }
 
   function openModal() {

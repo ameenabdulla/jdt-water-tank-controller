@@ -290,6 +290,23 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
           ESP.restart();
         }
       }
+
+      // Hard Reset command from Web Dashboard
+      if (msg.indexOf("\"hardreset\"") >= 0) {
+        Serial.println(F("Hard Reset received from Web Dashboard! Clearing WiFi settings..."));
+        preferences.begin("cfg", false);
+        preferences.clear();
+        preferences.end();
+        
+        for (int i = 0; i < 12; i++) {
+          digitalWrite(LED_PIN, HIGH);
+          delay(60);
+          digitalWrite(LED_PIN, LOW);
+          delay(60);
+        }
+        Serial.println(F("WiFi cleared. Rebooting into AP Hotspot Mode..."));
+        ESP.restart();
+      }
       break;
     }
   }
