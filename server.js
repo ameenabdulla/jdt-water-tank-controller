@@ -1,13 +1,14 @@
 /**
  * JDT Water Tank Controller — Render.com WebSocket Relay Server
- * Bridges hardware device and web browsers with instant disconnect detection via ping/pong.
+ * Device detection: based on telemetry silence (2.5s timeout).
+ * Browser connections are never terminated by the server.
  */
 
 'use strict';
-const http  = require('http');
+const http      = require('http');
 const WebSocket = require('ws');
-const fs    = require('fs');
-const path  = require('path');
+const fs        = require('fs');
+const path      = require('path');
 
 const PORT = process.env.PORT || 10000;
 
@@ -23,53 +24,50 @@ const MIME = {
 const httpServer = http.createServer((req, res) => {
   let urlPath = req.url.split('?')[0];
   if (urlPath === '/') urlPath = '/index.html';
-
   if (urlPath === '/ws' || urlPath === '/device') {
     res.writeHead(426, { 'Content-Type': 'text/plain' });
     res.end('WebSocket only');
     return;
   }
-
   const filePath = path.join(__dirname, 'public', urlPath);
   const ext  = path.extname(filePath);
-  const mime = MIME[ext] || 'text/plain';
-
   fs.readFile(filePath, (err, data) => {
     if (err) {
-      fs.readFile(path.join(__dirname, 'public', 'index.html'), (err2, data2) => {
-        if (err2) { res.writeHead(404); res.end('Not Found'); return; }
+      fs.readFile(path.join(__dirname, 'public', 'index.html'), (e2, d2) => {
+        if (e2) { res.writeHead(404); res.end('Not Found'); return; }
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
-        res.end(data2);
+        res.end(d2);
       });
       return;
     }
-    res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'no-cache' });
+    res.writeHead(200, { 'Content-Type': MIME[ext] || 'text/plain', 'Cache-Control': 'no-cache' });
     res.end(data);
   });
 });
 
-// ─── WebSocket relay ───
+// ─── State ───────────────────────────────────────────────────────────────────
+const browsers    = new Set();   // All connected browser clients
+let   deviceWs    = null;        // The one hardware device socket
+let   lastDevMs   = 0;           // Last time hardware sent telemetry (ms)
+let   deviceOnline = false;      // Current known device state
+const OFFLINE_PAYLOAD = JSON.stringify({ type: 'telemetry', deviceOnline: false, distanceCm: -1, sensorError: true });
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function broadcastBrowsers(data) {
+  browsers.forEach(b => { if (b.readyState === WebSocket.OPEN) b.send(data); });
+}
+
+function setDeviceOnline(online, reason) {
+  if (deviceOnline === online) return;          // No state change → no broadcast
+  deviceOnline = online;
+  console.log('[WS] Device', online ? 'ONLINE' : 'OFFLINE', '—', reason);
+  if (!online) {
+    broadcastBrowsers(OFFLINE_PAYLOAD);
+  }
+}
+
+// ─── WebSocket setup ──────────────────────────────────────────────────────────
 const wss = new WebSocket.Server({ noServer: true });
-
-const clients    = new Set();
-let deviceSocket = null;
-let lastTelemetry = null;
-let lastDeviceTime = 0;
-
-function markDeviceOffline(reason) {
-  console.log('[WS] Device OFFLINE —', reason);
-  deviceSocket  = null;
-  lastDeviceTime = 0;
-  const payload = JSON.stringify({ type: 'telemetry', deviceOnline: false, distanceCm: -1, sensorError: true });
-  lastTelemetry = payload;
-  broadcast(payload);
-}
-
-function broadcast(data, skip = null) {
-  clients.forEach(c => {
-    if (c !== skip && c.readyState === WebSocket.OPEN) c.send(data);
-  });
-}
 
 httpServer.on('upgrade', (req, socket, head) => {
   const url = req.url.split('?')[0];
@@ -80,89 +78,71 @@ httpServer.on('upgrade', (req, socket, head) => {
   }
 });
 
-wss.on('connection', (ws, req) => {
-  clients.add(ws);
-  ws.isAlive  = true;
-  ws.isDevice = false;
-  ws.on('pong', () => { ws.isAlive = true; });
+wss.on('connection', (ws) => {
+  console.log(`[WS] Connected (total ${wss.clients.size})`);
 
-  console.log(`[WS] Connected  (total ${clients.size})`);
-
-  // Tell the new browser whether the hardware device is currently live
-  const deviceActive = (deviceSocket !== null &&
-                        deviceSocket.readyState === WebSocket.OPEN &&
-                        (Date.now() - lastDeviceTime < 3000));
-
-  if (lastTelemetry) {
-    try {
-      const obj = JSON.parse(lastTelemetry);
-      obj.deviceOnline = deviceActive;
-      if (!deviceActive) obj.distanceCm = -1;
-      ws.send(JSON.stringify(obj));
-    } catch (_) { ws.send(lastTelemetry); }
-  } else {
-    ws.send(JSON.stringify({ type: 'telemetry', deviceOnline: deviceActive, distanceCm: -1 }));
-  }
+  // Send current device status immediately to new browser
+  browsers.add(ws);
+  ws.send(deviceOnline
+    ? JSON.stringify({ type: 'telemetry', deviceOnline: true, distanceCm: -1 })
+    : OFFLINE_PAYLOAD
+  );
 
   ws.on('message', raw => {
     const str = raw.toString();
     try {
       const msg = JSON.parse(str);
-      // Only the hardware device sends telemetry with distanceCm
+
+      // ── Hardware device telemetry ─────────────────────────────────────────
       if (msg.type === 'telemetry' || msg.distanceCm !== undefined) {
-        ws.isDevice    = true;
-        deviceSocket   = ws;
-        lastDeviceTime = Date.now();
+        // First packet from this socket → mark it as the device socket
+        if (deviceWs !== ws) {
+          if (deviceWs) {
+            // Remove old device from browser pool too
+            browsers.delete(deviceWs);
+          }
+          deviceWs = ws;
+          browsers.delete(ws);  // Device socket is NOT a browser
+        }
+        lastDevMs = Date.now();
+        setDeviceOnline(true, 'telemetry received');
         msg.deviceOnline = true;
-        lastTelemetry = JSON.stringify(msg);
-        broadcast(JSON.stringify(msg), ws);
+        broadcastBrowsers(JSON.stringify(msg));
         return;
       }
+
+      // ── Control / config from browser → relay to device ──────────────────
+      if (deviceWs && deviceWs.readyState === WebSocket.OPEN) {
+        deviceWs.send(str);
+      }
     } catch (_) {}
-    // Relay everything else (control commands, config) to all sockets
-    broadcast(str, ws);
   });
 
   ws.on('close', () => {
-    clients.delete(ws);
-    console.log(`[WS] Disconnected (total ${clients.size})`);
-    if (ws === deviceSocket || ws.isDevice) {
-      markDeviceOffline('socket closed');
+    browsers.delete(ws);
+    console.log(`[WS] Disconnected (total ${wss.clients.size})`);
+
+    if (ws === deviceWs) {
+      deviceWs = null;
+      lastDevMs = 0;
+      setDeviceOnline(false, 'device socket closed');
     }
   });
 
   ws.on('error', e => console.error('[WS] Error:', e.message));
 });
 
-// ─── Ping every socket every 1.5 s ───────────────────────────────────────────
-// If a socket doesn't reply with pong within the next cycle → kill it.
-// This catches abrupt power-off (no clean TCP close).
+// ─── Silence watchdog: if device hasn't sent in 2.5 s → offline ──────────────
 setInterval(() => {
-  wss.clients.forEach(ws => {
-    if (!ws.isAlive) {
-      // Dead socket — terminate it; 'close' event will fire and handle device state
-      ws.terminate();
-      return;
-    }
-    ws.isAlive = false;
-    try { ws.ping(); } catch (_) {}
-  });
-}, 1500);
-
-// ─── Safety-net: if device telemetry goes silent for 3 s → mark offline ──────
-setInterval(() => {
-  if (deviceSocket && (Date.now() - lastDeviceTime > 3000)) {
-    markDeviceOffline('telemetry silent 3 s');
-    if (deviceSocket) { try { deviceSocket.terminate(); } catch (_) {} }
+  if (deviceOnline && deviceWs && (Date.now() - lastDevMs > 2500)) {
+    setDeviceOnline(false, 'telemetry silent > 2.5s');
   }
 }, 500);
 
 // ─── Keep Render free-tier alive ─────────────────────────────────────────────
 const SELF_URL = process.env.RENDER_EXTERNAL_URL;
 if (SELF_URL) {
-  setInterval(() => {
-    require('https').get(SELF_URL, () => {}).on('error', () => {});
-  }, 14 * 60 * 1000);
+  setInterval(() => require('https').get(SELF_URL, () => {}).on('error', () => {}), 14 * 60 * 1000);
 }
 
-httpServer.listen(PORT, () => console.log(`JDT Tank Server running on port ${PORT}`));
+httpServer.listen(PORT, () => console.log(`JDT Tank Server on port ${PORT}`));

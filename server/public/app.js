@@ -279,48 +279,53 @@
   }
 
   // ═══════════════════════
-  //  WEBSOCKET & HEARTBEAT
+  //  WEBSOCKET
   // ═══════════════════════
   let reconTimer;
-  let lastDeviceHeartbeat = 0;
-
-  // Fast device online check (3.5s timeout)
-  setInterval(() => {
-    if (live.connected && (Date.now() - lastDeviceHeartbeat > 3500)) {
-      live.connected = false;
-      render();
-    }
-  }, 500);
 
   function connectWS() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(proto + '//' + location.host + '/ws');
+
     ws.onopen = () => {
-      // Browser connected to cloud server; awaiting hardware device packet
-      render();
+      // Connected to cloud server — wait for server to send device status
+      // Do NOT set live.connected here; server will tell us on first message
     };
+
     ws.onmessage = (ev) => {
       try {
         const d = JSON.parse(ev.data);
         if (d.type === 'telemetry' || d.distanceCm !== undefined) {
-          if (d.deviceOnline === false || d.distanceCm === -1) {
-            live.connected = false;
-            lastDeviceHeartbeat = 0;
-          } else {
-            lastDeviceHeartbeat = Date.now();
+          // Server explicitly tells us if the hardware device is online
+          if (d.deviceOnline === true && d.distanceCm !== undefined && d.distanceCm !== -1) {
             live.connected = true;
+            live.dist  = d.distanceCm;
+            live.err   = d.sensorError === true;
+            if (d.rssi    !== undefined) live.rssi   = d.rssi;
+            if (d.pumpOn  !== undefined) live.pumpOn = d.pumpOn;
+            if (d.mode    !== undefined) live.mode   = d.mode;
+          } else {
+            // deviceOnline: false, or distanceCm: -1 → device is offline
+            live.connected = false;
+            live.err       = true;
           }
-          live.dist = d.distanceCm;
-          live.err = d.sensorError || d.distanceCm === -1 || !live.connected;
-          if (d.rssi !== undefined) live.rssi = d.rssi;
-          if (d.pumpOn !== undefined) live.pumpOn = d.pumpOn;
-          if (d.mode !== undefined) live.mode = d.mode;
           render();
         }
       } catch (e) {}
     };
-    ws.onclose = () => { live.connected = false; render(); clearTimeout(reconTimer); reconTimer = setTimeout(connectWS, 2000); };
-    ws.onerror = () => { live.connected = false; render(); };
+
+    // If cloud server connection drops → show offline, retry in 2s
+    ws.onclose = () => {
+      live.connected = false;
+      render();
+      clearTimeout(reconTimer);
+      reconTimer = setTimeout(connectWS, 2000);
+    };
+
+    ws.onerror = () => {
+      live.connected = false;
+      render();
+    };
   }
 
   // ═══════════════════════
