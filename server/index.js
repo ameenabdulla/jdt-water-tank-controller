@@ -103,8 +103,13 @@ function broadcastConfig() {
 
 // Login Endpoint
 app.post('/api/login', (req, res) => {
-  const { username, password } = req.body || {};
-  if (username === authConfig.username && password === authConfig.password) {
+  const u = (req.body && req.body.username) ? String(req.body.username).trim().toLowerCase() : '';
+  const p = (req.body && req.body.password) ? String(req.body.password).trim() : '';
+
+  const expectedU = String(authConfig.username).trim().toLowerCase();
+  const expectedP = String(authConfig.password).trim();
+
+  if (u && p && u === expectedU && p === expectedP) {
     return res.json({ success: true, username: authConfig.username, token: 'authenticated-session-token-jdt' });
   }
   return res.status(401).json({ success: false, error: 'Incorrect Username or Password' });
@@ -113,11 +118,11 @@ app.post('/api/login', (req, res) => {
 // Update Credentials Endpoint
 app.post('/api/credentials', (req, res) => {
   const { newUsername, newPassword } = req.body || {};
-  if (newUsername && newUsername.trim()) {
-    authConfig.username = newUsername.trim();
+  if (newUsername && String(newUsername).trim()) {
+    authConfig.username = String(newUsername).trim();
   }
-  if (newPassword && newPassword.length >= 4) {
-    authConfig.password = newPassword;
+  if (newPassword && String(newPassword).trim().length >= 1) {
+    authConfig.password = String(newPassword).trim();
   }
   saveAuth();
   console.log(`[AUTH] Credentials updated & saved to file -> Username: ${authConfig.username}`);

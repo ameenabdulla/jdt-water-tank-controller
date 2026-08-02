@@ -166,7 +166,7 @@
     $.loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const u = $.loginUser.value.trim();
-      const p = $.loginPass.value;
+      const p = $.loginPass.value.trim();
 
       try {
         const res = await fetch('/api/login', {
@@ -188,7 +188,7 @@
       } catch (_) {}
 
       // Fallback local authentication
-      if (u === cfg.user && p === cfg.pass) {
+      if (u && p && u.toLowerCase() === String(cfg.user).trim().toLowerCase() && p === String(cfg.pass).trim()) {
         sessionStorage.setItem(K.LOGGED, 'true');
         $.loginError.textContent = '';
         showApp();
@@ -311,7 +311,6 @@
 
     if (newPass) {
       if (newPass !== newPass2) return alert('Passwords do not match.');
-      if (newPass.length < 4) return alert('Password must be at least 4 characters.');
     }
 
     if (newUser || newPass) {
