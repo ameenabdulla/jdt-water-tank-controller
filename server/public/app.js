@@ -294,23 +294,45 @@
     ws.onmessage = (ev) => {
       try {
         const d = JSON.parse(ev.data);
-        if (d.type !== 'telemetry' && d.distanceCm === undefined) return;
 
-        if (d.deviceOnline === true) {
-          // ── Hardware device is online and sending real data ──
-          live.connected = true;
-          if (d.distanceCm !== undefined) live.dist   = d.distanceCm;
-          if (d.sensorError !== undefined) live.err   = d.sensorError;
-          if (d.rssi        !== undefined) live.rssi  = d.rssi;
-          if (d.pumpOn      !== undefined) live.pumpOn = d.pumpOn;
-          if (d.mode        !== undefined) live.mode  = d.mode;
-        } else {
-          // ── Hardware device is offline ──
-          live.connected = false;
-          live.err       = true;
-          live.dist      = -1;
+        // ── State message from server (deployed format) ──────────────────
+        // Server sends: {type:"state", online:true, distanceCm, levelPercent, pumpOn, mode, rssi, lastSeen}
+        if (d.type === 'state') {
+          if (d.online === true) {
+            live.connected = true;
+            if (d.distanceCm    !== undefined) live.dist   = d.distanceCm;
+            if (d.levelPercent  !== undefined) live.pct    = d.levelPercent;
+            if (d.rssi          !== undefined) live.rssi   = d.rssi;
+            if (d.pumpOn        !== undefined) live.pumpOn = d.pumpOn;
+            if (d.mode          !== undefined) live.mode   = d.mode;
+            live.err = false;
+          } else {
+            live.connected = false;
+            live.err       = true;
+          }
+          render();
+          return;
         }
-        render();
+
+        // ── Telemetry message (raw firmware format with deviceOnline flag) ─
+        // Server sends: {type:"telemetry", deviceOnline:true, distanceCm, rssi, sensorError}
+        if (d.type === 'telemetry' || d.distanceCm !== undefined || d.deviceOnline !== undefined) {
+          const isOnline = d.deviceOnline === true || d.online === true;
+          if (isOnline) {
+            live.connected = true;
+            if (d.distanceCm   !== undefined) live.dist   = d.distanceCm;
+            if (d.sensorError  !== undefined) live.err    = d.sensorError;
+            if (d.rssi         !== undefined) live.rssi   = d.rssi;
+            if (d.pumpOn       !== undefined) live.pumpOn = d.pumpOn;
+            if (d.mode         !== undefined) live.mode   = d.mode;
+          } else {
+            live.connected = false;
+            live.err       = true;
+          }
+          render();
+          return;
+        }
+
       } catch (e) {}
     };
 
@@ -326,6 +348,7 @@
       render();
     };
   }
+
 
   // ═══════════════════════
   //  RENDER
@@ -347,11 +370,20 @@
     const usable = tankH - off;
     let dist = live.dist, dDisp = dist, depth = 0, pct = 0;
 
-    if (!isErr && usable > 0) {
-      if (dist < off) dDisp = off;
-      depth = Math.max(0, tankH - dDisp);
-      pct = Math.min(100, Math.max(0, (depth / usable) * 100));
+    if (!isErr) {
+      // If server sends pre-calculated levelPercent, use it directly
+      if (live.pct !== undefined && live.pct >= 0) {
+        pct = Math.min(100, Math.max(0, live.pct));
+        depth = (pct / 100) * usable;
+        dDisp = Math.max(off, tankH - depth);
+      } else if (usable > 0) {
+        // Fallback: calculate from distanceCm
+        if (dist < off) dDisp = off;
+        depth = Math.max(0, tankH - dDisp);
+        pct = Math.min(100, Math.max(0, (depth / usable) * 100));
+      }
     }
+
 
     // Tank
     $.water.style.height = isErr ? '0%' : (pct.toFixed(1) + '%');
