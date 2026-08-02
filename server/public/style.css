@@ -337,7 +337,7 @@ body {
 .water {
   position: absolute; bottom: 0; left: 0; right: 0;
   background: linear-gradient(180deg, #38bdf8 0%, #0284c7 35%, #075985 100%);
-  transition: height 0.7s var(--ease);
+  transition: height 0.3s ease-out;
 }
 .wave {
   position: absolute; top: -9px; left: 0;
@@ -446,7 +446,7 @@ body {
   height: 100%;
   background: linear-gradient(90deg, var(--accent2), var(--accent));
   border-radius: 3px;
-  transition: width 0.7s var(--ease);
+  transition: width 0.3s ease-out;
 }
 
 /* Metrics */
