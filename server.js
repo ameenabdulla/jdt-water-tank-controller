@@ -1,7 +1,7 @@
 /**
  * JDT Water Tank Controller — Render.com WebSocket Relay Server
- * Device detection: based on telemetry silence (2.5s timeout).
- * Browser connections are never terminated by the server.
+ * Cleanly separates hardware device socket from browser sockets.
+ * Device identified by first telemetry packet it sends.
  */
 
 'use strict';
@@ -30,7 +30,7 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
   const filePath = path.join(__dirname, 'public', urlPath);
-  const ext  = path.extname(filePath);
+  const ext = path.extname(filePath);
   fs.readFile(filePath, (err, data) => {
     if (err) {
       fs.readFile(path.join(__dirname, 'public', 'index.html'), (e2, d2) => {
@@ -46,27 +46,19 @@ const httpServer = http.createServer((req, res) => {
 });
 
 // ─── State ───────────────────────────────────────────────────────────────────
-const browsers    = new Set();   // All connected browser clients
-let   deviceWs    = null;        // The one hardware device socket
-let   lastDevMs   = 0;           // Last time hardware sent telemetry (ms)
-let   deviceOnline = false;      // Current known device state
-const OFFLINE_PAYLOAD = JSON.stringify({ type: 'telemetry', deviceOnline: false, distanceCm: -1, sensorError: true });
+const browsers      = new Set();  // All connected browser WebSockets
+let   deviceWs      = null;       // The hardware device socket (ESP32)
+let   lastDevMs     = 0;          // Timestamp of last telemetry from device
+let   lastRealData  = null;       // Last full telemetry JSON string from device (with deviceOnline:true)
+const OFFLINE_MSG   = JSON.stringify({ type: 'telemetry', deviceOnline: false, distanceCm: -1, sensorError: true });
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-function broadcastBrowsers(data) {
-  browsers.forEach(b => { if (b.readyState === WebSocket.OPEN) b.send(data); });
+function broadcastBrowsers(msg) {
+  browsers.forEach(b => {
+    if (b.readyState === WebSocket.OPEN) b.send(msg);
+  });
 }
 
-function setDeviceOnline(online, reason) {
-  if (deviceOnline === online) return;          // No state change → no broadcast
-  deviceOnline = online;
-  console.log('[WS] Device', online ? 'ONLINE' : 'OFFLINE', '—', reason);
-  if (!online) {
-    broadcastBrowsers(OFFLINE_PAYLOAD);
-  }
-}
-
-// ─── WebSocket setup ──────────────────────────────────────────────────────────
+// ─── WebSocket ────────────────────────────────────────────────────────────────
 const wss = new WebSocket.Server({ noServer: true });
 
 httpServer.on('upgrade', (req, socket, head) => {
@@ -79,63 +71,81 @@ httpServer.on('upgrade', (req, socket, head) => {
 });
 
 wss.on('connection', (ws) => {
-  console.log(`[WS] Connected (total ${wss.clients.size})`);
-
-  // Send current device status immediately to new browser
+  // All new connections start as browsers until they send telemetry
   browsers.add(ws);
-  ws.send(deviceOnline
-    ? JSON.stringify({ type: 'telemetry', deviceOnline: true, distanceCm: -1 })
-    : OFFLINE_PAYLOAD
-  );
+  console.log(`[WS] Connected  — total ${wss.clients.size}`);
+
+  // Immediately tell the new browser the current device status
+  const isActive = deviceWs !== null && deviceWs.readyState === WebSocket.OPEN && (Date.now() - lastDevMs < 3000);
+  if (isActive && lastRealData) {
+    ws.send(lastRealData);   // Send the most recent real sensor data
+  } else {
+    ws.send(OFFLINE_MSG);    // Device not connected — show offline
+  }
 
   ws.on('message', raw => {
     const str = raw.toString();
-    try {
-      const msg = JSON.parse(str);
+    let msg;
+    try { msg = JSON.parse(str); } catch (_) { return; }
 
-      // ── Hardware device telemetry ─────────────────────────────────────────
-      if (msg.type === 'telemetry' || msg.distanceCm !== undefined) {
-        // First packet from this socket → mark it as the device socket
-        if (deviceWs !== ws) {
-          if (deviceWs) {
-            // Remove old device from browser pool too
-            browsers.delete(deviceWs);
-          }
-          deviceWs = ws;
-          browsers.delete(ws);  // Device socket is NOT a browser
+    // ── Is this telemetry from the hardware device? ───────────────────────
+    if (msg.type === 'telemetry' || msg.distanceCm !== undefined) {
+      // First telemetry packet: promote this socket to device
+      if (ws !== deviceWs) {
+        console.log('[WS] Hardware device identified');
+        if (deviceWs) {
+          // Old device socket orphaned — close it cleanly
+          try { deviceWs.close(); } catch (_) {}
         }
-        lastDevMs = Date.now();
-        setDeviceOnline(true, 'telemetry received');
-        msg.deviceOnline = true;
-        broadcastBrowsers(JSON.stringify(msg));
-        return;
+        deviceWs = ws;
+        browsers.delete(ws);  // Device is not a browser
       }
 
-      // ── Control / config from browser → relay to device ──────────────────
-      if (deviceWs && deviceWs.readyState === WebSocket.OPEN) {
-        deviceWs.send(str);
-      }
-    } catch (_) {}
+      lastDevMs = Date.now();
+
+      // Attach deviceOnline flag and cache it
+      msg.deviceOnline = true;
+      const out = JSON.stringify(msg);
+      lastRealData = out;
+
+      // Forward to all connected browser tabs
+      broadcastBrowsers(out);
+      return;
+    }
+
+    // ── Control / config message from browser → relay to device ──────────
+    if (deviceWs && deviceWs.readyState === WebSocket.OPEN) {
+      deviceWs.send(str);
+    }
   });
 
   ws.on('close', () => {
     browsers.delete(ws);
-    console.log(`[WS] Disconnected (total ${wss.clients.size})`);
+    console.log(`[WS] Disconnected — total ${wss.clients.size}`);
 
     if (ws === deviceWs) {
-      deviceWs = null;
-      lastDevMs = 0;
-      setDeviceOnline(false, 'device socket closed');
+      console.log('[WS] Hardware device DISCONNECTED');
+      deviceWs   = null;
+      lastDevMs  = 0;
+      lastRealData = null;
+      broadcastBrowsers(OFFLINE_MSG);
     }
   });
 
   ws.on('error', e => console.error('[WS] Error:', e.message));
 });
 
-// ─── Silence watchdog: if device hasn't sent in 2.5 s → offline ──────────────
+// ─── Telemetry silence watchdog ───────────────────────────────────────────────
+// If device stops sending for >3s (e.g. power cut without clean TCP close),
+// mark it offline and notify all browsers.
 setInterval(() => {
-  if (deviceOnline && deviceWs && (Date.now() - lastDevMs > 2500)) {
-    setDeviceOnline(false, 'telemetry silent > 2.5s');
+  if (deviceWs !== null && (Date.now() - lastDevMs) > 3000) {
+    console.log('[WS] Device silent >3s → marking OFFLINE');
+    try { deviceWs.terminate(); } catch (_) {}
+    deviceWs   = null;
+    lastDevMs  = 0;
+    lastRealData = null;
+    broadcastBrowsers(OFFLINE_MSG);
   }
 }, 500);
 

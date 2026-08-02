@@ -288,33 +288,32 @@
     ws = new WebSocket(proto + '//' + location.host + '/ws');
 
     ws.onopen = () => {
-      // Connected to cloud server — wait for server to send device status
-      // Do NOT set live.connected here; server will tell us on first message
+      // Connected to cloud relay — server will immediately send device status
     };
 
     ws.onmessage = (ev) => {
       try {
         const d = JSON.parse(ev.data);
-        if (d.type === 'telemetry' || d.distanceCm !== undefined) {
-          // Server explicitly tells us if the hardware device is online
-          if (d.deviceOnline === true && d.distanceCm !== undefined && d.distanceCm !== -1) {
-            live.connected = true;
-            live.dist  = d.distanceCm;
-            live.err   = d.sensorError === true;
-            if (d.rssi    !== undefined) live.rssi   = d.rssi;
-            if (d.pumpOn  !== undefined) live.pumpOn = d.pumpOn;
-            if (d.mode    !== undefined) live.mode   = d.mode;
-          } else {
-            // deviceOnline: false, or distanceCm: -1 → device is offline
-            live.connected = false;
-            live.err       = true;
-          }
-          render();
+        if (d.type !== 'telemetry' && d.distanceCm === undefined) return;
+
+        if (d.deviceOnline === true) {
+          // ── Hardware device is online and sending real data ──
+          live.connected = true;
+          if (d.distanceCm !== undefined) live.dist   = d.distanceCm;
+          if (d.sensorError !== undefined) live.err   = d.sensorError;
+          if (d.rssi        !== undefined) live.rssi  = d.rssi;
+          if (d.pumpOn      !== undefined) live.pumpOn = d.pumpOn;
+          if (d.mode        !== undefined) live.mode  = d.mode;
+        } else {
+          // ── Hardware device is offline ──
+          live.connected = false;
+          live.err       = true;
+          live.dist      = -1;
         }
+        render();
       } catch (e) {}
     };
 
-    // If cloud server connection drops → show offline, retry in 2s
     ws.onclose = () => {
       live.connected = false;
       render();
