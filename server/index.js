@@ -14,11 +14,24 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── Authentication Config (Stored in memory, can be changed via API) ───
-let authConfig = {
-  username: 'admin',
-  password: 'admin'
-};
+// ── Authentication Config (Persisted in auth.json) ─────────────────────────
+const AUTH_FILE = path.join(__dirname, 'auth.json');
+let authConfig = { username: 'admin', password: 'admin' };
+
+try {
+  if (fs.existsSync(AUTH_FILE)) {
+    const data = JSON.parse(fs.readFileSync(AUTH_FILE, 'utf8'));
+    if (data.username) authConfig.username = data.username;
+    if (data.password) authConfig.password = data.password;
+    console.log(`[AUTH] Loaded credentials from file -> Username: ${authConfig.username}`);
+  }
+} catch (e) {}
+
+function saveAuth() {
+  try {
+    fs.writeFileSync(AUTH_FILE, JSON.stringify(authConfig, null, 2));
+  } catch (e) {}
+}
 
 // ── Tank State ──────────────────────────────────────────────────────────
 let tankState = {
@@ -106,7 +119,8 @@ app.post('/api/credentials', (req, res) => {
   if (newPassword && newPassword.length >= 4) {
     authConfig.password = newPassword;
   }
-  console.log(`[AUTH] Credentials updated on server -> Username: ${authConfig.username}`);
+  saveAuth();
+  console.log(`[AUTH] Credentials updated & saved to file -> Username: ${authConfig.username}`);
   return res.json({ success: true, username: authConfig.username });
 });
 

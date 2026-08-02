@@ -272,9 +272,9 @@
     localStorage.setItem(K.HIGH, hi);
 
     // Credentials update
-    const newUser = $.sUser.value.trim();
-    const newPass = $.sCredPass.value;
-    const newPass2 = $.sCredPass2.value;
+    const newUser = $.sUser ? $.sUser.value.trim() : '';
+    const newPass = $.sCredPass ? $.sCredPass.value : '';
+    const newPass2 = $.sCredPass2 ? $.sCredPass2.value : '';
 
     if (newPass) {
       if (newPass !== newPass2) return alert('Passwords do not match.');
@@ -283,14 +283,23 @@
 
     if (newUser || newPass) {
       const payload = {};
-      if (newUser) { cfg.user = newUser; localStorage.setItem(K.USER, newUser); payload.newUsername = newUser; }
-      if (newPass) { cfg.pass = newPass; localStorage.setItem(K.PASS, newPass); payload.newPassword = newPass; }
+      if (newUser) payload.newUsername = newUser;
+      if (newPass) payload.newPassword = newPass;
 
       fetch('/api/credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
-      }).catch(() => {});
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.success) {
+          if (newUser) { cfg.user = newUser; localStorage.setItem(K.USER, newUser); }
+          if (newPass) { cfg.pass = newPass; localStorage.setItem(K.PASS, newPass); }
+          alert('🔐 Login credentials updated on server! You can now log in with the new credentials on all phones.');
+        }
+      })
+      .catch(() => {});
     }
 
     // Send config to ESP32
