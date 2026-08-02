@@ -108,7 +108,10 @@
 
         <!-- Hero Level -->
         <div class="card card-hero">
-          <span class="label">WATER LEVEL</span>
+          <div class="hero-head">
+            <span class="label">WATER LEVEL</span>
+            <span class="hero-status-badge" id="hero-status-badge">💧 Level Normal</span>
+          </div>
           <div class="hero-val">
             <span class="hero-num" id="lvl-num">0.0</span>
             <span class="hero-unit">%</span>
@@ -119,24 +122,24 @@
         <!-- Metrics -->
         <div class="metrics">
           <div class="card card-metric">
-            <span class="label">DISTANCE</span>
+            <span class="label">AIR GAP</span>
             <div class="mv"><span class="mn" id="m-dist">--</span><span class="mu">cm</span></div>
-            <span class="mh">Sensor air gap</span>
+            <span class="mh">Sensor to water surface</span>
           </div>
           <div class="card card-metric">
             <span class="label">WATER DEPTH</span>
             <div class="mv"><span class="mn" id="m-depth">--</span><span class="mu">cm</span></div>
-            <span class="mh">Current depth</span>
+            <span class="mh">Actual water height</span>
           </div>
           <div class="card card-metric">
-            <span class="label">TANK HEIGHT</span>
+            <span class="label">TOTAL HEIGHT</span>
             <div class="mv"><span class="mn" id="m-tank">100</span><span class="mu">cm</span></div>
-            <span class="mh">From settings</span>
+            <span class="mh">Full tank depth</span>
           </div>
           <div class="card card-metric">
             <span class="label">WIFI SIGNAL</span>
             <div class="mv"><span class="mn" id="m-rssi">--</span><span class="mu">dBm</span></div>
-            <span class="mh" id="rssi-q">--</span>
+            <span class="mh" id="rssi-q">Excellent</span>
           </div>
         </div>
 
@@ -144,16 +147,19 @@
         <div class="card card-pump">
           <div class="pump-head">
             <div class="pump-ico"><i data-lucide="zap"></i></div>
-            <div><h3>Pump Control</h3><p class="pump-sub" id="pump-sub">Mode: AUTO</p></div>
+            <div>
+              <h3>Water Pump Switch</h3>
+              <p class="pump-sub" id="pump-sub">Automatic Mode (Smart Control)</p>
+            </div>
           </div>
           <div class="mode-tabs">
-            <button class="mtab active" id="tab-auto">AUTO</button>
-            <button class="mtab" id="tab-manual">MANUAL</button>
+            <button class="mtab active" id="tab-auto">⚡ AUTO (Smart)</button>
+            <button class="mtab" id="tab-manual">🖐️ MANUAL</button>
           </div>
           <div class="motor-row">
             <div>
-              <span class="motor-label">Motor Status</span>
-              <span class="motor-detail" id="motor-detail">Relay: IDLE</span>
+              <span class="motor-label">Water Pump Power</span>
+              <span class="motor-detail" id="motor-detail">Pump is currently OFF</span>
             </div>
             <div class="motor-right">
               <span class="motor-badge" id="motor-badge">OFF</span>
@@ -161,8 +167,8 @@
             </div>
           </div>
           <div class="thresholds">
-            <span><span class="td tl"></span>ON below <strong id="th-lo">20%</strong></span>
-            <span><span class="td th"></span>OFF above <strong id="th-hi">90%</strong></span>
+            <span><span class="td tl"></span>Auto Turn ON below <strong id="th-lo">20%</strong></span>
+            <span><span class="td th"></span>Auto Turn OFF above <strong id="th-hi">90%</strong></span>
           </div>
         </div>
 

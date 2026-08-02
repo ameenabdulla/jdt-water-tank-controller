@@ -80,6 +80,7 @@
 
       water: document.getElementById('water'),
       tankPct: document.getElementById('tank-pct-text'),
+      heroStatusBadge: document.getElementById('hero-status-badge'),
       lvlNum: document.getElementById('lvl-num'),
       lvlBar: document.getElementById('lvl-bar'),
       mDist: document.getElementById('m-dist'),
@@ -333,6 +334,23 @@
     $.water.style.height = pct.toFixed(1) + '%';
     $.tankPct.textContent = pct.toFixed(1) + '%';
 
+    // Hero Status Badge
+    if ($.heroStatusBadge) {
+      if (isErr) {
+        $.heroStatusBadge.textContent = '⚠️ Checking Sensor...';
+        $.heroStatusBadge.className = 'hero-status-badge warn';
+      } else if (pct >= 90) {
+        $.heroStatusBadge.textContent = '✅ Tank Full';
+        $.heroStatusBadge.className = 'hero-status-badge ok';
+      } else if (pct <= cfg.low) {
+        $.heroStatusBadge.textContent = '⚠️ Level Low';
+        $.heroStatusBadge.className = 'hero-status-badge warn';
+      } else {
+        $.heroStatusBadge.textContent = '💧 Level Normal';
+        $.heroStatusBadge.className = 'hero-status-badge ok';
+      }
+    }
+
     // Hero
     $.lvlNum.textContent = isErr ? '--' : pct.toFixed(1);
     $.lvlBar.style.width = pct.toFixed(1) + '%';
@@ -345,9 +363,9 @@
 
     if (live.connected) {
       const r = live.rssi;
-      $.rssiQ.textContent = r >= -50 ? 'Excellent' : r >= -60 ? 'Good' : r >= -70 ? 'Fair' : 'Weak';
+      $.rssiQ.textContent = r >= -55 ? 'Strong Signal' : r >= -70 ? 'Good Signal' : 'Weak Signal';
     } else {
-      $.rssiQ.textContent = '--';
+      $.rssiQ.textContent = 'Disconnected';
     }
 
     // Live dist in modal
@@ -362,20 +380,20 @@
     // Mode
     if (live.mode === 'AUTO') {
       $.tabAuto.classList.add('active'); $.tabManual.classList.remove('active');
-      $.pumpSub.textContent = 'Mode: AUTO'; $.pumpSw.disabled = true;
+      $.pumpSub.textContent = 'Automatic Mode (Smart Control)'; $.pumpSw.disabled = true;
     } else {
       $.tabAuto.classList.remove('active'); $.tabManual.classList.add('active');
-      $.pumpSub.textContent = 'Mode: MANUAL'; $.pumpSw.disabled = false;
+      $.pumpSub.textContent = 'Manual Mode (User Switch Override)'; $.pumpSw.disabled = false;
     }
 
     // Pump
     $.pumpSw.checked = live.pumpOn;
     if (live.pumpOn) {
       $.motorBadge.className = 'motor-badge on'; $.motorBadge.textContent = 'ON';
-      $.motorDetail.textContent = 'Relay: ACTIVE';
+      $.motorDetail.textContent = 'Water pump is RUNNING';
     } else {
       $.motorBadge.className = 'motor-badge off'; $.motorBadge.textContent = 'OFF';
-      $.motorDetail.textContent = 'Relay: IDLE';
+      $.motorDetail.textContent = 'Water pump is turned OFF';
     }
   }
 
