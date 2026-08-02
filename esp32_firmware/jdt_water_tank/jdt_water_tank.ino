@@ -307,6 +307,12 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         Serial.println(F("WiFi cleared. Rebooting into AP Hotspot Mode..."));
         ESP.restart();
       }
+
+      // WiFi Scan request from Web Dashboard
+      if (msg.indexOf("\"scanwifi\"") >= 0) {
+        Serial.println(F("WiFi scan requested from Web Dashboard..."));
+        WiFi.scanNetworks(true); // Start async scan
+      }
       break;
     }
   }
@@ -382,6 +388,22 @@ void loop() {
       digitalWrite(LED_PIN, ledState);
     }
     return;
+  }
+
+  // Check if async WiFi scan from web requested finished
+  int scanN = WiFi.scanComplete();
+  if (scanN >= 0) {
+    String scanJson = "{\"type\":\"wifiscan\",\"networks\":[";
+    for (int i = 0; i < scanN; ++i) {
+      if (i > 0) scanJson += ",";
+      scanJson += "{\"ssid\":\"" + WiFi.SSID(i) + "\",\"rssi\":" + String(WiFi.RSSI(i)) + "}";
+    }
+    scanJson += "]}";
+    WiFi.scanDelete();
+    if (webSocket.isConnected()) {
+      webSocket.sendTXT(scanJson);
+      Serial.println(F("WiFi scan results sent to Web Dashboard!"));
+    }
   }
   
   if (WiFi.status() != WL_CONNECTED) {

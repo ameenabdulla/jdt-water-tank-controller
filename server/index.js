@@ -228,6 +228,16 @@ wss.on('connection', (ws) => {
         console.log(`[WS] Relayed Hard Reset command to ESP32!`);
       }
 
+      if (data.type === 'scanwifi' || data.type === 'wifiscan') {
+        const payload = JSON.stringify(data);
+        wss.clients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN && client !== ws) {
+            client.send(payload);
+          }
+        });
+        console.log(`[WS] Relayed ${data.type} message`);
+      }
+
       // ESP32 telemetry via WebSocket
       if (data.type === 'telemetry') {
         tankState.lastSeen = Date.now();

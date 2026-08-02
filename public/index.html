@@ -228,7 +228,9 @@
         <div class="sec-title"><i data-lucide="wifi"></i> WiFi Credentials (STA Mode)</div>
         <div class="field">
           <label>Router SSID</label>
-          <input type="text" id="s-ssid" class="finput full" placeholder="WiFi network name">
+          <p class="hint" id="wifi-scan-status">Select from scanned networks below or type manually.</p>
+          <input type="text" id="s-ssid" list="wifi-list-options" class="finput full" placeholder="Select or type WiFi name..." autocomplete="off">
+          <datalist id="wifi-list-options"></datalist>
         </div>
         <div class="field">
           <label>Router Password</label>

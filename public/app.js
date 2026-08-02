@@ -114,7 +114,9 @@
       sUser: document.getElementById('s-user'),
       sCredPass: document.getElementById('s-cred-pass'),
       sCredPass2: document.getElementById('s-cred-pass2'),
-      btnHardReset: document.getElementById('btn-hard-reset')
+      btnHardReset: document.getElementById('btn-hard-reset'),
+      wifiDatalist: document.getElementById('wifi-list-options'),
+      wifiScanStatus: document.getElementById('wifi-scan-status')
     };
   }
 
@@ -221,6 +223,13 @@
     $.sCredPass.value = '';
     $.sCredPass2.value = '';
     $.sLive.textContent = (live.dist > 0 && !live.err) ? live.dist.toFixed(1) + ' cm' : '-- cm';
+
+    // Request nearby WiFi scan from ESP32
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'scanwifi' }));
+      if ($.wifiScanStatus) $.wifiScanStatus.textContent = '⚡ Scanning nearby WiFi networks...';
+    }
+
     $.overlay.classList.add('open');
   }
 
@@ -323,6 +332,24 @@
     ws.onmessage = (ev) => {
       try {
         const d = JSON.parse(ev.data);
+
+        // ── WiFi scan results from ESP32 ──────────────────────────────────
+        if (d.type === 'wifiscan' && Array.isArray(d.networks)) {
+          if ($.wifiDatalist) {
+            $.wifiDatalist.innerHTML = '';
+            d.networks.forEach(net => {
+              if (!net.ssid) return;
+              const opt = document.createElement('option');
+              opt.value = net.ssid;
+              opt.label = net.ssid + (net.rssi ? ' (' + net.rssi + ' dBm)' : '');
+              $.wifiDatalist.appendChild(opt);
+            });
+          }
+          if ($.wifiScanStatus) {
+            $.wifiScanStatus.textContent = '✅ Found ' + d.networks.length + ' networks. Select from list or type manually.';
+          }
+          return;
+        }
 
         // ── State message from server (deployed format) ──────────────────
         // Server sends: {type:"state", online:true, distanceCm, levelPercent, pumpOn, mode, rssi, lastSeen}
