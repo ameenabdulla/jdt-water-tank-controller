@@ -349,8 +349,8 @@ void loop() {
     webSocket.loop();
   }
   
-  // High-speed telemetry update every 100ms
-  if (millis() - lastTelemetryTime > 100) {
+  // Send telemetry every 1 second (stable on Render free-tier SSL)
+  if (millis() - lastTelemetryTime > 1000) {
     lastTelemetryTime = millis();
     
     float newDist = measureDistance();
