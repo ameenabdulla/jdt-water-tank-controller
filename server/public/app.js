@@ -130,17 +130,37 @@
       showApp();
     }
 
-    $.loginForm.addEventListener('submit', (e) => {
+    $.loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const u = $.loginUser.value.trim();
       const p = $.loginPass.value;
 
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: u, password: p })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          sessionStorage.setItem(K.LOGGED, 'true');
+          cfg.user = u;
+          cfg.pass = p;
+          localStorage.setItem(K.USER, u);
+          localStorage.setItem(K.PASS, p);
+          $.loginError.textContent = '';
+          showApp();
+          return;
+        }
+      } catch (_) {}
+
+      // Fallback local authentication
       if (u === cfg.user && p === cfg.pass) {
         sessionStorage.setItem(K.LOGGED, 'true');
         $.loginError.textContent = '';
         showApp();
       } else {
-        $.loginError.textContent = 'Invalid username or password.';
+        $.loginError.textContent = 'Incorrect username or password.';
         $.loginPass.value = '';
         $.loginPass.focus();
       }
@@ -256,15 +276,21 @@
     const newPass = $.sCredPass.value;
     const newPass2 = $.sCredPass2.value;
 
-    if (newUser) {
-      cfg.user = newUser;
-      localStorage.setItem(K.USER, newUser);
-    }
     if (newPass) {
       if (newPass !== newPass2) return alert('Passwords do not match.');
       if (newPass.length < 4) return alert('Password must be at least 4 characters.');
-      cfg.pass = newPass;
-      localStorage.setItem(K.PASS, newPass);
+    }
+
+    if (newUser || newPass) {
+      const payload = {};
+      if (newUser) { cfg.user = newUser; localStorage.setItem(K.USER, newUser); payload.newUsername = newUser; }
+      if (newPass) { cfg.pass = newPass; localStorage.setItem(K.PASS, newPass); payload.newPassword = newPass; }
+
+      fetch('/api/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).catch(() => {});
     }
 
     // Send config to ESP32

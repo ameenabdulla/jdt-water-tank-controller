@@ -17,7 +17,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ── Authentication Config (Stored in memory, can be changed via API) ───
 let authConfig = {
   username: 'admin',
-  password: 'admin@123'
+  password: 'admin'
 };
 
 // ── Tank State ──────────────────────────────────────────────────────────
@@ -90,22 +90,24 @@ function broadcastConfig() {
 
 // Login Endpoint
 app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
+  const { username, password } = req.body || {};
   if (username === authConfig.username && password === authConfig.password) {
-    return res.json({ success: true, token: 'authenticated-session-token-jdt' });
+    return res.json({ success: true, username: authConfig.username, token: 'authenticated-session-token-jdt' });
   }
   return res.status(401).json({ success: false, error: 'Incorrect Username or Password' });
 });
 
-// Change Password Endpoint
-app.post('/api/change-password', (req, res) => {
-  const { currentPassword, newPassword } = req.body;
-  if (currentPassword === authConfig.password) {
-    authConfig.password = newPassword;
-    console.log('[AUTH] Password changed successfully');
-    return res.json({ success: true });
+// Update Credentials Endpoint
+app.post('/api/credentials', (req, res) => {
+  const { newUsername, newPassword } = req.body || {};
+  if (newUsername && newUsername.trim()) {
+    authConfig.username = newUsername.trim();
   }
-  return res.status(400).json({ success: false, error: 'Incorrect current password' });
+  if (newPassword && newPassword.length >= 4) {
+    authConfig.password = newPassword;
+  }
+  console.log(`[AUTH] Credentials updated on server -> Username: ${authConfig.username}`);
+  return res.json({ success: true, username: authConfig.username });
 });
 
 app.get('/api/status', (req, res) => {
