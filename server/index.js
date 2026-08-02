@@ -45,7 +45,7 @@ const MAX_HISTORY = 50;
 
 function isDeviceOnline() {
   if (!tankState.lastSeen) return false;
-  return (Date.now() - tankState.lastSeen) < 15000;
+  return (Date.now() - tankState.lastSeen) < 4000;
 }
 
 function calculateLevel(distanceCm) {
@@ -242,11 +242,20 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
+    // Immediately re-evaluate online status and notify all browsers
     broadcastState();
   });
 });
 
-setInterval(() => { broadcastState(); }, 5000);
+// Watchdog: every 500ms check if device has gone silent → broadcast offline
+setInterval(() => {
+  if (tankState.lastSeen && !isDeviceOnline()) {
+    // Device just timed out — clear lastSeen so we only broadcast once
+    tankState.lastSeen = null;
+    broadcastState();
+    console.log('[WDG] Device offline — silent >4s');
+  }
+}, 500);
 
 server.listen(PORT, () => {
   console.log(`====================================================`);
