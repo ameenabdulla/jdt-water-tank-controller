@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>JDT Water Tank Controller — Printable A4 Sticker Sheet</title>
+  <style>
+    @page { size: A4 portrait; margin: 0; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      color: #0f172a;
+    }
+    .a4-page {
+      width: 210mm;
+      height: 297mm;
+      padding: 15mm 12mm;
+      box-sizing: border-box;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 15mm;
+      align-items: center;
+      justify-content: flex-start;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+    @media print {
+      body { background: #ffffff; }
+      .a4-page { box-shadow: none; padding: 10mm 10mm; }
+      .no-print { display: none !important; }
+    }
+    .print-bar {
+      margin-bottom: 20px;
+      padding: 12px 24px;
+      background: #0ea5e9;
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      border: none;
+      font-size: 1rem;
+      box-shadow: 0 4px 12px rgba(14,165,233,0.3);
+    }
+
+    /* Sticker Box */
+    .sticker {
+      width: 180mm;
+      border: 2px dashed #94a3b8;
+      border-radius: 12px;
+      padding: 6mm;
+      box-sizing: border-box;
+      background: #ffffff;
+      position: relative;
+    }
+    .sticker-inner {
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .header {
+      background: #0f172a;
+      color: white;
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header h2 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+    .badge {
+      background: #0ea5e9;
+      color: #ffffff;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .badge-purple { background: #a855f7; }
+
+    .content {
+      display: flex;
+      padding: 16px;
+      gap: 20px;
+      align-items: center;
+      background: #ffffff;
+    }
+    .qr-box img {
+      width: 45mm;
+      height: 45mm;
+      display: block;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+    }
+    .info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .link {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #0284c7;
+      word-break: break-all;
+    }
+    .details {
+      background: #f1f5f9;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.85rem;
+      color: #334155;
+      line-height: 1.4;
+    }
+    .details strong { color: #0f172a; }
+    .cut-notice {
+      position: absolute;
+      top: -10px;
+      right: 15px;
+      background: #ffffff;
+      padding: 0 8px;
+      font-size: 0.68rem;
+      color: #64748b;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <button class="print-bar no-print" onclick="window.print()">🖨️ Print A4 Sticker Sheet (Ctrl + P)</button>
+
+  <div class="a4-page">
+
+    <!-- STICKER 1: CLOUD DASHBOARD -->
+    <div class="sticker">
+      <div class="cut-notice">✂️ CUT ALONG DASHED LINE</div>
+      <div class="sticker-inner">
+        <div class="header">
+          <h2>JDT Water Tank Controller</h2>
+          <span class="badge">Cloud Web Dashboard</span>
+        </div>
+        <div class="content">
+          <div class="qr-box">
+            <img src="jdt_qr_code.png" alt="Cloud Dashboard QR">
+          </div>
+          <div class="info">
+            <span class="label">Web Address (URL)</span>
+            <span class="link">https://jdt-water-tank-controller.onrender.com</span>
+            <div class="details">
+              <strong>🔑 Access Credentials:</strong><br>
+              Username: <code>admin</code> &bull; Password: <code>admin</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STICKER 2: LOCAL HOTSPOT SETUP -->
+    <div class="sticker">
+      <div class="cut-notice">✂️ CUT ALONG DASHED LINE</div>
+      <div class="sticker-inner">
+        <div class="header">
+          <h2>JDT Water Tank Controller</h2>
+          <span class="badge badge-purple">WiFi Setup Hotspot</span>
+        </div>
+        <div class="content">
+          <div class="qr-box">
+            <img src="esp32_hotspot_qr.png" alt="Hotspot QR">
+          </div>
+          <div class="info">
+            <span class="label">Hotspot Setup Address</span>
+            <span class="link">http://192.168.4.1</span>
+            <div class="details">
+              <strong>📶 Connect to WiFi Hotspot first:</strong><br>
+              Hotspot SSID: <code>JDT-Tank-Setup</code> &bull; Password: <code>12345678</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>
