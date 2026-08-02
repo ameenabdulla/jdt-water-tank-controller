@@ -237,6 +237,20 @@ void checkResetButton() {
   }
 }
 
+String getJsonValue(String json, String key) {
+  String searchKey = "\"" + key + "\":\"";
+  int startKey = json.indexOf(searchKey);
+  if (startKey == -1) {
+    searchKey = "\"" + key + "\": \"";
+    startKey = json.indexOf(searchKey);
+  }
+  if (startKey == -1) return "";
+  startKey += searchKey.length();
+  int endKey = json.indexOf("\"", startKey);
+  if (endKey == -1) return "";
+  return json.substring(startKey, endKey);
+}
+
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
   switch(type) {
     case WStype_DISCONNECTED:
@@ -258,6 +272,23 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         pumpState = false;
         digitalWrite(RELAY_PIN, LOW);
         Serial.println(F("Pump OFF from Server"));
+      }
+
+      // WiFi config update from Web Dashboard
+      if (msg.indexOf("\"wificonfig\"") >= 0 || msg.indexOf("\"ssid\"") >= 0) {
+        String newSsid = getJsonValue(msg, "ssid");
+        String newPass = getJsonValue(msg, "pass");
+        if (newSsid.length() > 0) {
+          Serial.print(F("Updating WiFi Credentials -> SSID: "));
+          Serial.println(newSsid);
+          preferences.begin("cfg", false);
+          preferences.putString("ssid", newSsid);
+          preferences.putString("pass", newPass);
+          preferences.end();
+          Serial.println(F("Saved to preferences! Rebooting to connect to new WiFi..."));
+          delay(1000);
+          ESP.restart();
+        }
       }
       break;
     }

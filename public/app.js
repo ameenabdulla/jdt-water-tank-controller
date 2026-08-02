@@ -244,14 +244,28 @@
     }
 
     // Send config to ESP32
+    const newSsid = $.sSsid ? $.sSsid.value.trim() : '';
+    const newWifiPass = $.sPass ? $.sPass.value.trim() : '';
+
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
         type: 'config',
         tankHeight: h, sensorOffset: o,
-        autoLow: lo, autoHigh: hi,
-        ssid: $.sSsid.value.trim() || undefined,
-        pass: $.sPass.value.trim() || undefined
+        autoLow: lo, autoHigh: hi
       }));
+
+      if (newSsid) {
+        ws.send(JSON.stringify({
+          type: 'wificonfig',
+          ssid: newSsid,
+          pass: newWifiPass
+        }));
+        alert('WiFi credentials sent to device! The ESP32 is restarting to connect to "' + newSsid + '".');
+        if ($.sSsid) $.sSsid.value = '';
+        if ($.sPass) $.sPass.value = '';
+      }
+    } else if (newSsid) {
+      alert('Device is currently offline. Connect the ESP32 to send new WiFi settings.');
     }
 
     render();

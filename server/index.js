@@ -208,6 +208,16 @@ wss.on('connection', (ws) => {
         broadcastState();
       }
 
+      if (data.type === 'wificonfig') {
+        const payload = JSON.stringify({ type: 'wificonfig', ssid: data.ssid, pass: data.pass || '' });
+        wss.clients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN && client !== ws) {
+            client.send(payload);
+          }
+        });
+        console.log(`[WS] Relayed WiFi config update for SSID: ${data.ssid}`);
+      }
+
       // ESP32 telemetry via WebSocket
       if (data.type === 'telemetry') {
         tankState.lastSeen = Date.now();
