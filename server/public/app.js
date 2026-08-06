@@ -52,11 +52,11 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     cacheDom();
-    setupLogin();
     setupTheme();
     setupModal();
     setupPump();
     setupPwa();
+    showApp();
     render();
     connectWS();
   });
