@@ -62,13 +62,30 @@ function saveState() {
   } catch (e) {}
 }
 
-// ── Tank Configuration ──────────────────────────────────────────────────
+// ── Tank Configuration (Persisted in tank_config.json) ────────────────────
+const CONFIG_FILE = path.join(__dirname, 'tank_config.json');
 let tankConfig = {
   tankDepthCm: 150,
   lowThreshold: 20,
   highThreshold: 90,
   sensorOffsetCm: 20
 };
+
+try {
+  if (fs.existsSync(CONFIG_FILE)) {
+    const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    if (data.tankDepthCm) tankConfig.tankDepthCm = data.tankDepthCm;
+    if (data.lowThreshold) tankConfig.lowThreshold = data.lowThreshold;
+    if (data.highThreshold) tankConfig.highThreshold = data.highThreshold;
+    if (data.sensorOffsetCm !== undefined) tankConfig.sensorOffsetCm = data.sensorOffsetCm;
+  }
+} catch (e) {}
+
+function saveConfig() {
+  try {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(tankConfig, null, 2));
+  } catch (e) {}
+}
 
 // ── History for Graph ───────────────────────────────────────────────────
 let history = [];
@@ -222,6 +239,7 @@ app.post('/api/config', (req, res) => {
   if (req.body.sensorOffsetCm !== undefined) tankConfig.sensorOffsetCm = parseFloat(req.body.sensorOffsetCm);
   
   tankState.levelPercent = calculateLevel(tankState.distanceCm);
+  saveConfig();
   
   broadcastConfig();
   broadcastState();
