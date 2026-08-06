@@ -491,19 +491,22 @@
 
     // Calc
     const isErr = !live.connected || live.err || live.dist <= 0;
-    const tankH = cfg.tankH;
-    const off = cfg.offset;
-    const usable = tankH - off;
+    const tankH = cfg.tankH || 150;
+    const off = 20; // Strict 20cm blind zone offset
+    const usable = Math.max(1, tankH - off);
     let dist = live.dist, dDisp = dist, depth = 0, pct = 0;
 
     if (!isErr) {
-      // If server sends pre-calculated levelPercent, use it directly
-      if (live.pct !== undefined && live.pct >= 0) {
+      // STRICT 20cm RULE: Distance <= 20cm is ALWAYS 100% Full!
+      if (dist <= 20.0 && dist > 0) {
+        pct = 100.0;
+        depth = usable;
+        dDisp = 20.0;
+      } else if (live.pct !== undefined && live.pct >= 0) {
         pct = Math.min(100, Math.max(0, live.pct));
         depth = (pct / 100) * usable;
         dDisp = Math.max(off, tankH - depth);
       } else if (usable > 0) {
-        // Fallback: calculate from distanceCm
         if (dist < off) dDisp = off;
         depth = Math.max(0, tankH - dDisp);
         pct = Math.min(100, Math.max(0, (depth / usable) * 100));

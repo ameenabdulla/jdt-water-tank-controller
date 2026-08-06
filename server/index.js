@@ -46,10 +46,10 @@ let tankState = {
 
 // ── Tank Configuration ──────────────────────────────────────────────────
 let tankConfig = {
-  tankDepthCm: 100,
+  tankDepthCm: 150,
   lowThreshold: 20,
   highThreshold: 90,
-  sensorOffsetCm: 5
+  sensorOffsetCm: 20
 };
 
 // ── History for Graph ───────────────────────────────────────────────────
@@ -62,9 +62,31 @@ function isDeviceOnline() {
 }
 
 function calculateLevel(distanceCm) {
-  const effectiveDepth = tankConfig.tankDepthCm - tankConfig.sensorOffsetCm;
-  const waterHeight = effectiveDepth - (distanceCm - tankConfig.sensorOffsetCm);
-  let percent = (waterHeight / effectiveDepth) * 100;
+  if (!distanceCm || distanceCm <= 0) return 0;
+
+  const minGap = tankConfig.sensorOffsetCm || 20.0; // Strict 20cm blind zone
+  let depth = tankConfig.tankDepthCm || 150.0;
+
+  // Auto-expand configured depth if physical distance reading is deeper
+  if (distanceCm > depth) {
+    depth = Math.ceil(distanceCm);
+    tankConfig.tankDepthCm = depth;
+  }
+
+  // STRICT 20cm RULE:
+  // Any distance <= 20cm is 100% FULL!
+  if (distanceCm <= minGap) {
+    return 100.0;
+  }
+
+  // Distance >= total depth is 0% EMPTY!
+  if (distanceCm >= depth) {
+    return 0.0;
+  }
+
+  const usableDepth = depth - minGap;
+  const waterHeight = depth - distanceCm;
+  let percent = (waterHeight / usableDepth) * 100.0;
   percent = Math.max(0, Math.min(100, percent));
   return Math.round(percent * 10) / 10;
 }
