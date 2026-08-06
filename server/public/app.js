@@ -163,11 +163,17 @@
       showApp();
     }
 
-    $.loginForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const u = $.loginUser.value.trim();
-      const p = $.loginPass.value.trim();
+    async function doLogin(e) {
+      if (e) e.preventDefault();
+      const u = $.loginUser ? $.loginUser.value.trim() : '';
+      const p = $.loginPass ? $.loginPass.value.trim() : '';
 
+      if (!u || !p) {
+        if ($.loginError) $.loginError.textContent = 'Please enter username and password.';
+        return;
+      }
+
+      // Check 1: Server Authentication API
       try {
         const res = await fetch('/api/login', {
           method: 'POST',
@@ -181,45 +187,65 @@
           cfg.pass = p;
           localStorage.setItem(K.USER, u);
           localStorage.setItem(K.PASS, p);
-          $.loginError.textContent = '';
+          if ($.loginError) $.loginError.textContent = '';
           showApp();
           return;
         }
       } catch (_) {}
 
-      // Fallback local authentication
-      const isLocalUser = (u.toLowerCase() === String(cfg.user).trim().toLowerCase() || u.toLowerCase() === 'admin');
-      const isLocalPass = (p === String(cfg.pass).trim() || p === '1234' || p === 'admin' || p === 'admin@123');
+      // Check 2: Universal Fallback Authentication (accepts admin, 1234, admin@123, or saved pass)
+      const isUserMatch = (u.toLowerCase() === String(cfg.user).trim().toLowerCase() || u.toLowerCase() === 'admin');
+      const isPassMatch = (p === String(cfg.pass).trim() || p === '1234' || p === 'admin' || p === 'admin@123');
 
-      if (u && p && isLocalUser && isLocalPass) {
+      if (isUserMatch && isPassMatch) {
         sessionStorage.setItem(K.LOGGED, 'true');
-        $.loginError.textContent = '';
+        if ($.loginError) $.loginError.textContent = '';
         showApp();
       } else {
-        $.loginError.textContent = 'Incorrect username or password.';
-        $.loginPass.value = '';
-        $.loginPass.focus();
+        if ($.loginError) $.loginError.textContent = 'Incorrect username or password.';
+        if ($.loginPass) {
+          $.loginPass.value = '';
+          $.loginPass.focus();
+        }
       }
-    });
+    }
 
-    $.btnLogout.addEventListener('click', () => {
-      sessionStorage.removeItem(K.LOGGED);
-      hideApp();
-    });
+    if ($.loginForm) $.loginForm.addEventListener('submit', doLogin);
+    if ($.btnLogout) {
+      $.btnLogout.addEventListener('click', () => {
+        sessionStorage.removeItem(K.LOGGED);
+        hideApp();
+      });
+    }
   }
 
   function showApp() {
-    $.loginScreen.classList.add('hidden');
-    $.app.classList.remove('hidden');
+    if ($.loginScreen) {
+      $.loginScreen.classList.add('hidden');
+      $.loginScreen.style.display = 'none';
+    }
+    if ($.app) {
+      $.app.classList.remove('hidden');
+      $.app.style.display = 'block';
+    }
+    window.scrollTo(0, 0);
   }
 
   function hideApp() {
-    $.app.classList.add('hidden');
-    $.loginScreen.classList.remove('hidden');
-    $.loginUser.value = '';
-    $.loginPass.value = '';
-    $.loginError.textContent = '';
-    $.loginUser.focus();
+    if ($.app) {
+      $.app.classList.add('hidden');
+      $.app.style.display = 'none';
+    }
+    if ($.loginScreen) {
+      $.loginScreen.classList.remove('hidden');
+      $.loginScreen.style.display = 'flex';
+    }
+    if ($.loginUser) {
+      $.loginUser.value = '';
+      $.loginUser.focus();
+    }
+    if ($.loginPass) $.loginPass.value = '';
+    if ($.loginError) $.loginError.textContent = '';
   }
 
   // ═══════════════════════
