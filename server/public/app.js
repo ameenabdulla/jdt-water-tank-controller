@@ -454,49 +454,15 @@
           } else {
             live.connected = false;
             live.err       = true;
-          }
-          render();
-          return;
-        }
-
-      } catch (e) {}
-    };
-
-    ws.onclose = () => {
-      live.connected = false;
-      render();
-      clearTimeout(reconTimer);
-      reconTimer = setTimeout(connectWS, 2000);
-    };
-
-    ws.onerror = () => {
-      live.connected = false;
-      render();
-    };
-  }
-
-
-  // ═══════════════════════
-  //  RENDER
-  // ═══════════════════════
-  function render() {
-    // Status
-    if (live.connected) {
-      $.statusPill.className = 'status-pill online';
-      $.statusText.textContent = 'DEVICE ONLINE';
-    } else {
-      $.statusPill.className = 'status-pill offline';
-      $.statusText.textContent = 'DEVICE OFFLINE';
-    }
-
-    // Calc
-    const isErr = !live.connected || live.err || live.dist <= 0;
+      // Calc
+    const hasData = live.dist > 0 || (live.pct !== undefined && live.pct >= 0);
+    const isErr = live.err || !hasData;
     const tankH = cfg.tankH || 150;
     const off = 20; // Strict 20cm blind zone offset
     const usable = Math.max(1, tankH - off);
     let dist = live.dist, dDisp = dist, depth = 0, pct = 0;
 
-    if (!isErr) {
+    if (hasData) {
       // STRICT 20cm RULE: Distance <= 20cm is ALWAYS 100% Full!
       if (dist <= 20.0 && dist > 0) {
         pct = 100.0;
@@ -513,15 +479,14 @@
       }
     }
 
-
-    // Tank
-    $.water.style.height = isErr ? '0%' : (pct.toFixed(1) + '%');
-    $.tankPct.textContent = isErr ? '0%' : (pct.toFixed(1) + '%');
+    // Tank visual level (retains last known percentage when offline)
+    $.water.style.height = (!hasData) ? '0%' : (pct.toFixed(1) + '%');
+    $.tankPct.textContent = (!hasData) ? '0%' : (pct.toFixed(1) + '%');
 
     // Hero Status Badge
     if ($.heroStatusBadge) {
       if (!live.connected) {
-        $.heroStatusBadge.textContent = '🔌 Device Offline';
+        $.heroStatusBadge.textContent = hasData ? '🔌 Offline (Last Known: ' + pct.toFixed(1) + '%)' : '🔌 Device Offline';
         $.heroStatusBadge.className = 'hero-status-badge warn';
       } else if (live.err) {
         $.heroStatusBadge.textContent = '⚠️ Checking Sensor...';
@@ -536,15 +501,13 @@
         $.heroStatusBadge.textContent = '💧 Level Normal';
         $.heroStatusBadge.className = 'hero-status-badge ok';
       }
-    }
-
     // Hero
-    $.lvlNum.textContent = isErr ? '--' : pct.toFixed(1);
-    $.lvlBar.style.width = isErr ? '0%' : (pct.toFixed(1) + '%');
+    $.lvlNum.textContent = !hasData ? '--' : pct.toFixed(1);
+    $.lvlBar.style.width = !hasData ? '0%' : (pct.toFixed(1) + '%');
 
     // Metrics
-    $.mDist.textContent = isErr ? '--' : dDisp.toFixed(1);
-    $.mDepth.textContent = isErr ? '--' : depth.toFixed(1);
+    $.mDist.textContent = !hasData ? '--' : dDisp.toFixed(1);
+    $.mDepth.textContent = !hasData ? '--' : depth.toFixed(1);
     $.mTank.textContent = tankH;
     $.mRssi.textContent = live.connected ? live.rssi : '--';
 
