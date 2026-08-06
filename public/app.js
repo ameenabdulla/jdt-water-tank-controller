@@ -57,11 +57,11 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     cacheDom();
+    setupLogin();
     setupTheme();
     setupModal();
     setupPump();
     setupPwa();
-    showApp();
     fetchStatus();
     setInterval(fetchStatus, 2000);
     render();

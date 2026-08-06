@@ -19,8 +19,8 @@
 </head>
 <body>
 
-  <!-- ═══════ LOGIN SCREEN (Hidden — Direct Access Enabled) ═══════ -->
-  <div class="login-screen hidden" id="login-screen" style="display:none;">
+  <!-- ═══════ LOGIN SCREEN ═══════ -->
+  <div class="login-screen" id="login-screen">
     <div class="login-bg"></div>
     <div class="login-card">
       <div class="login-logo">
@@ -32,11 +32,11 @@
       <form id="login-form" autocomplete="off">
         <div class="login-field">
           <label><i data-lucide="user"></i> Username</label>
-          <input type="text" id="login-user" class="login-input" placeholder="Enter username" autocomplete="username" autocapitalize="none" spellcheck="false">
+          <input type="text" id="login-user" class="login-input" placeholder="Enter username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
         </div>
         <div class="login-field">
           <label><i data-lucide="lock"></i> Password</label>
-          <input type="password" id="login-pass" class="login-input" placeholder="Enter password" autocomplete="current-password" autocapitalize="none" spellcheck="false">
+          <input type="password" id="login-pass" class="login-input" placeholder="Enter password" autocomplete="current-password" autocapitalize="none" spellcheck="false" required>
         </div>
         <p class="login-error" id="login-error"></p>
         <button type="submit" class="login-btn">
@@ -47,8 +47,8 @@
     </div>
   </div>
 
-  <!-- ═══════ MAIN APP (Direct Access) ═══════ -->
-  <div class="app" id="app" style="display:block;">
+  <!-- ═══════ MAIN APP (protected by login) ═══════ -->
+  <div class="app hidden" id="app">
 
     <!-- Header -->
     <header class="header">
@@ -74,6 +74,9 @@
         </button>
         <button class="icon-btn" id="btn-settings" title="Settings">
           <i data-lucide="settings"></i>
+        </button>
+        <button class="icon-btn logout-btn" id="btn-logout" title="Logout">
+          <i data-lucide="log-out"></i>
         </button>
       </div>
     </header>
@@ -271,7 +274,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=10.0"></script>
+  <script src="app.js?v=11.0"></script>
   <script>if(window.lucide) lucide.createIcons();</script>
 </body>
 </html>
