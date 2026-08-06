@@ -19,13 +19,17 @@
 
   const DEF = {
     theme: 'dark',
-    tankH: 100,
-    offset: 5,
+    tankH: 150,
+    offset: 20,
     low: 20,
     high: 90,
     user: 'admin',
     pass: 'admin'
   };
+
+  // Wipe outdated 100cm / 5cm localStorage overrides from browser cache
+  if (localStorage.getItem(K.TANK_H) === '100') localStorage.removeItem(K.TANK_H);
+  if (localStorage.getItem(K.OFFSET) === '5') localStorage.removeItem(K.OFFSET);
 
   function ld(k, d) { const v = localStorage.getItem(k); return v === null ? d : v; }
   function ldn(k, d) { const n = parseFloat(localStorage.getItem(k)); return isNaN(n) ? d : n; }
@@ -137,20 +141,17 @@
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
-      if ($.btnInstallPwa) {
-        $.btnInstallPwa.classList.remove('hidden');
-      }
     });
 
     if ($.btnInstallPwa) {
       $.btnInstallPwa.addEventListener('click', async () => {
-        if (!deferredPrompt) return;
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') {
-          $.btnInstallPwa.classList.add('hidden');
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          await deferredPrompt.userChoice;
+          deferredPrompt = null;
+        } else {
+          alert('📲 To Install JDT Tank App on your Phone:\n\n• Android (Chrome): Tap menu (⋮) -> "Add to Home screen" or "Install App"\n• iPhone (Safari): Tap Share button (↑) -> "Add to Home Screen"');
         }
-        deferredPrompt = null;
       });
     }
   }
