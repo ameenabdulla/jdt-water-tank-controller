@@ -57,6 +57,8 @@
     setupPump();
     setupPwa();
     showApp();
+    fetchStatus();
+    setInterval(fetchStatus, 2000);
     render();
     connectWS();
   });
@@ -413,8 +415,24 @@
   }
 
   // ═══════════════════════
-  //  WEBSOCKET
+  //  HTTP POLLING & WEBSOCKET
   // ═══════════════════════
+  async function fetchStatus() {
+    try {
+      const res = await fetch('/api/status');
+      if (res.ok) {
+        const d = await res.json();
+        live.connected = (d.online === true);
+        if (d.distanceCm !== undefined) live.dist = d.distanceCm;
+        if (d.levelPercent !== undefined) live.pct = d.levelPercent;
+        if (d.rssi !== undefined) live.rssi = d.rssi;
+        if (d.pumpOn !== undefined) live.pumpOn = d.pumpOn;
+        if (d.mode !== undefined) live.mode = d.mode;
+        render();
+      }
+    } catch (_) {}
+  }
+
   let reconTimer;
 
   function connectWS() {
