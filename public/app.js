@@ -45,9 +45,10 @@
 
   const live = {
     connected: true,
-    dist: -1,
-    rssi: 0,
-    pumpOn: false,
+    dist: 135.2,
+    pct: 11.4,
+    rssi: -86,
+    pumpOn: true,
     mode: 'AUTO',
     err: false
   };
