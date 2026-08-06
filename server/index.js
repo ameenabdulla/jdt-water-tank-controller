@@ -33,16 +33,34 @@ function saveAuth() {
   } catch (e) {}
 }
 
-// ── Tank State ──────────────────────────────────────────────────────────
+// ── Tank State (Persisted in tank_state.json) ───────────────────────────
+const STATE_FILE = path.join(__dirname, 'tank_state.json');
 let tankState = {
-  distanceCm: 0,
-  levelPercent: 0,
-  pumpOn: false,
+  distanceCm: 135.0,
+  levelPercent: 11.5,
+  pumpOn: true,
   mode: 'AUTO',
-  online: false,
-  lastSeen: null,
-  rssi: 0
+  online: true,
+  lastSeen: Date.now(),
+  rssi: -86
 };
+
+try {
+  if (fs.existsSync(STATE_FILE)) {
+    const data = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    if (data.distanceCm) tankState.distanceCm = data.distanceCm;
+    if (data.levelPercent !== undefined) tankState.levelPercent = data.levelPercent;
+    if (data.pumpOn !== undefined) tankState.pumpOn = data.pumpOn;
+    if (data.mode) tankState.mode = data.mode;
+    if (data.rssi) tankState.rssi = data.rssi;
+  }
+} catch (e) {}
+
+function saveState() {
+  try {
+    fs.writeFileSync(STATE_FILE, JSON.stringify(tankState, null, 2));
+  } catch (e) {}
+}
 
 // ── Tank Configuration ──────────────────────────────────────────────────
 let tankConfig = {
@@ -303,6 +321,7 @@ wss.on('connection', (ws) => {
           }
         }
 
+        saveState();
         broadcastState(ws);
         ws.send(JSON.stringify({ type: 'command', pumpOn: tankState.pumpOn }));
       }
