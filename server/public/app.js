@@ -40,7 +40,7 @@
   };
 
   const live = {
-    connected: false,
+    connected: true,
     dist: -1,
     rssi: 0,
     pumpOn: false,

@@ -58,7 +58,7 @@ const MAX_HISTORY = 50;
 
 function isDeviceOnline() {
   if (!tankState.lastSeen) return false;
-  return (Date.now() - tankState.lastSeen) < 2000;
+  return (Date.now() - tankState.lastSeen) < 6000;
 }
 
 function calculateLevel(distanceCm) {
