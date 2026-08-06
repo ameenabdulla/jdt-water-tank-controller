@@ -233,13 +233,22 @@ app.post('/api/device', (req, res) => {
 
 // Update config
 app.post('/api/config', (req, res) => {
-  if (req.body.tankDepthCm !== undefined) tankConfig.tankDepthCm = parseFloat(req.body.tankDepthCm);
-  if (req.body.lowThreshold !== undefined) tankConfig.lowThreshold = parseFloat(req.body.lowThreshold);
-  if (req.body.highThreshold !== undefined) tankConfig.highThreshold = parseFloat(req.body.highThreshold);
-  if (req.body.sensorOffsetCm !== undefined) tankConfig.sensorOffsetCm = parseFloat(req.body.sensorOffsetCm);
+  const b = req.body || {};
+  if (b.tankDepthCm !== undefined) tankConfig.tankDepthCm = parseFloat(b.tankDepthCm);
+  else if (b.tankHeight !== undefined) tankConfig.tankDepthCm = parseFloat(b.tankHeight);
+
+  if (b.sensorOffsetCm !== undefined) tankConfig.sensorOffsetCm = parseFloat(b.sensorOffsetCm);
+  else if (b.sensorOffset !== undefined) tankConfig.sensorOffsetCm = parseFloat(b.sensorOffset);
+
+  if (b.lowThreshold !== undefined) tankConfig.lowThreshold = parseFloat(b.lowThreshold);
+  else if (b.autoLow !== undefined) tankConfig.lowThreshold = parseFloat(b.autoLow);
+
+  if (b.highThreshold !== undefined) tankConfig.highThreshold = parseFloat(b.highThreshold);
+  else if (b.autoHigh !== undefined) tankConfig.highThreshold = parseFloat(b.autoHigh);
   
   tankState.levelPercent = calculateLevel(tankState.distanceCm);
   saveConfig();
+  saveState();
   
   broadcastConfig();
   broadcastState();
@@ -283,10 +292,20 @@ wss.on('connection', (ws) => {
 
       if (data.type === 'config') {
         if (data.tankDepthCm !== undefined) tankConfig.tankDepthCm = parseFloat(data.tankDepthCm);
-        if (data.lowThreshold !== undefined) tankConfig.lowThreshold = parseFloat(data.lowThreshold);
-        if (data.highThreshold !== undefined) tankConfig.highThreshold = parseFloat(data.highThreshold);
+        else if (data.tankHeight !== undefined) tankConfig.tankDepthCm = parseFloat(data.tankHeight);
+
         if (data.sensorOffsetCm !== undefined) tankConfig.sensorOffsetCm = parseFloat(data.sensorOffsetCm);
+        else if (data.sensorOffset !== undefined) tankConfig.sensorOffsetCm = parseFloat(data.sensorOffset);
+
+        if (data.lowThreshold !== undefined) tankConfig.lowThreshold = parseFloat(data.lowThreshold);
+        else if (data.autoLow !== undefined) tankConfig.lowThreshold = parseFloat(data.autoLow);
+
+        if (data.highThreshold !== undefined) tankConfig.highThreshold = parseFloat(data.highThreshold);
+        else if (data.autoHigh !== undefined) tankConfig.highThreshold = parseFloat(data.autoHigh);
+
         tankState.levelPercent = calculateLevel(tankState.distanceCm);
+        saveConfig();
+        saveState();
         broadcastConfig();
         broadcastState();
       }

@@ -337,6 +337,18 @@
     localStorage.setItem(K.LOW, lo);
     localStorage.setItem(K.HIGH, hi);
 
+    // Send REST POST /api/config so cloud server updates tankConfig for ALL devices globally
+    fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tankDepthCm: h,
+        sensorOffsetCm: o,
+        lowThreshold: lo,
+        highThreshold: hi
+      })
+    }).catch(() => {});
+
     // Credentials update
     const newUser = $.sUser ? $.sUser.value.trim() : '';
     const newPass = $.sCredPass ? $.sCredPass.value : '';
@@ -367,15 +379,15 @@
       .catch(() => {});
     }
 
-    // Send config to ESP32
+    // Send config to ESP32 & Cloud WebSocket
     const newSsid = $.sSsid ? $.sSsid.value.trim() : '';
     const newWifiPass = $.sPass ? $.sPass.value.trim() : '';
 
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
         type: 'config',
-        tankHeight: h, sensorOffset: o,
-        autoLow: lo, autoHigh: hi
+        tankDepthCm: h, sensorOffsetCm: o,
+        lowThreshold: lo, highThreshold: hi
       }));
 
       if (newSsid) {
@@ -430,6 +442,15 @@
         if (d.rssi !== undefined) live.rssi = d.rssi;
         if (d.pumpOn !== undefined) live.pumpOn = d.pumpOn;
         if (d.mode !== undefined) live.mode = d.mode;
+
+        // SYNC CONFIG FROM SERVER FOR ALL DEVICES:
+        if (d.config) {
+          if (d.config.tankDepthCm) cfg.tankH = d.config.tankDepthCm;
+          if (d.config.sensorOffsetCm !== undefined) cfg.offset = d.config.sensorOffsetCm;
+          if (d.config.lowThreshold) cfg.low = d.config.lowThreshold;
+          if (d.config.highThreshold) cfg.high = d.config.highThreshold;
+        }
+
         render();
       }
     } catch (_) {}
@@ -448,6 +469,20 @@
     ws.onmessage = (ev) => {
       try {
         const d = JSON.parse(ev.data);
+
+        // ── Config message broadcast from server ─────────────────────────
+        if (d.type === 'config') {
+          const depth = d.tankDepthCm || d.tankHeight;
+          const off = d.sensorOffsetCm || d.sensorOffset;
+          const lo = d.lowThreshold || d.autoLow;
+          const hi = d.highThreshold || d.autoHigh;
+          if (depth) cfg.tankH = depth;
+          if (off !== undefined) cfg.offset = off;
+          if (lo) cfg.low = lo;
+          if (hi) cfg.high = hi;
+          render();
+          return;
+        }
 
         // ── WiFi scan results from ESP32 ──────────────────────────────────
         if (d.type === 'wifiscan' && Array.isArray(d.networks)) {
