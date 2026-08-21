@@ -129,23 +129,18 @@
     };
   }
 
-  // ═══════════════════════
-  //  PWA MOBILE APP INSTALL
-  // ═══════════════════════
-  let deferredPrompt;
+  // Global PWA Prompt Listener registered immediately on script load
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    console.log('[PWA] Captured beforeinstallprompt event globally!');
+  });
 
   function setupPwa() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      if ($.btnInstallPwa) {
-        $.btnInstallPwa.style.display = 'inline-flex';
-      }
-    });
 
     if ($.btnInstallPwa) {
       $.btnInstallPwa.addEventListener('click', async () => {
@@ -153,9 +148,7 @@
           try {
             deferredPrompt.prompt();
             const { outcome } = await deferredPrompt.userChoice;
-            if (outcome === 'accepted') {
-              console.log('[PWA] User accepted install prompt');
-            }
+            console.log('[PWA] Install prompt outcome:', outcome);
             deferredPrompt = null;
           } catch (_) {
             showPwaInstructions();
@@ -172,7 +165,7 @@
     if (isIOS) {
       alert('📱 Install on iPhone / iPad (Safari):\n\n1. Tap the Share button ( ⎋ / ↥ ) at the bottom of Safari.\n2. Scroll down and tap "Add to Home Screen" ( ➕ ).\n3. Tap "Add" at the top right!');
     } else {
-      alert('📱 Install on Android / Laptop (Chrome):\n\n1. Tap the 3 dots menu ( ⋮ ) at the top right of Chrome.\n2. Tap "Add to Home screen" or "Install app".\n3. Tap "Install" to create your standalone app icon!');
+      alert('⚡ Install JDT Tank App:\n\n• Look at the top right of your Chrome address bar — click the "Open in app" or Install icon (⬇️)!\n\nOR:\n• Tap Chrome menu (⋮) -> "Install JDT Water Tank Controller" or "Add to Home screen".');
     }
   }
 
