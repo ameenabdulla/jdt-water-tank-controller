@@ -18,17 +18,7 @@
       window.deferredPrompt = e;
     });
     if ('serviceWorker' in navigator) {
-      // Clear ALL old service workers and caches, then register fresh
-      navigator.serviceWorker.getRegistrations().then(function(regs) {
-        var p = regs.map(function(r) { return r.unregister(); });
-        return Promise.all(p);
-      }).then(function() {
-        return caches.keys();
-      }).then(function(keys) {
-        return Promise.all(keys.map(function(k) { return caches.delete(k); }));
-      }).then(function() {
-        navigator.serviceWorker.register('/sw.js');
-      }).catch(function(){});
+      navigator.serviceWorker.register('/sw.js');
     }
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -322,7 +312,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=21.0"></script>
+  <script src="app.js?v=22.0"></script>
   <script>if(window.lucide) lucide.createIcons();</script>
 </body>
 </html>
