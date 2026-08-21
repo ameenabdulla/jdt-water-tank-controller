@@ -475,7 +475,16 @@
     ws = new WebSocket(proto + '//' + location.host + '/ws');
 
     ws.onopen = () => {
-      // Connected to cloud relay — server will immediately send device status
+      // Restore saved config to server on every connect (survives Render restart)
+      if (cfg.tankH && cfg.tankH > 0) {
+        ws.send(JSON.stringify({
+          type: 'config',
+          tankDepthCm: cfg.tankH,
+          sensorOffsetCm: cfg.offset || 20,
+          lowThreshold: cfg.low || 20,
+          highThreshold: cfg.high || 90
+        }));
+      }
     };
 
     ws.onmessage = (ev) => {
