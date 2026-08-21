@@ -416,6 +416,20 @@ void loop() {
   } else {
     webSocket.loop();
   }
+
+  // ── COMMERCIAL REBOOT WATCHDOG ──────────────────────────────────────────
+  // If disconnected from WiFi or WebSocket for > 3 mins, cleanly reboot ESP32!
+  static unsigned long disconnectStartTime = 0;
+  if (WiFi.status() != WL_CONNECTED || !webSocket.isConnected()) {
+    if (disconnectStartTime == 0) {
+      disconnectStartTime = millis();
+    } else if (millis() - disconnectStartTime > 180000) {
+      Serial.println(F("[WATCHDOG] Disconnected > 3 mins! Rebooting ESP32..."));
+      ESP.restart();
+    }
+  } else {
+    disconnectStartTime = 0;
+  }
   
   // Send telemetry every 500ms for smooth live updates
   if (millis() - lastTelemetryTime > 500) {
