@@ -519,6 +519,7 @@
         if (d.type === 'telemetry' || d.distanceCm !== undefined || d.deviceOnline !== undefined) {
           live.connected = (d.deviceOnline === true || d.online === true);
           if (d.distanceCm   !== undefined) live.dist   = d.distanceCm;
+          if (d.levelPercent !== undefined) live.pct    = d.levelPercent;
           if (d.sensorError  !== undefined) live.err    = d.sensorError;
           if (d.rssi         !== undefined) live.rssi   = d.rssi;
           if (d.pumpOn       !== undefined) live.pumpOn = d.pumpOn;
@@ -558,13 +559,13 @@
 
     // Calc
     const tankH = Math.max(50, cfg.tankH || 150);
-    const off = 20; // Strict 20cm blind zone offset
-    const usable = Math.max(30, tankH - off);
+    const off = cfg.offset || 20; // Sensor offset (20cm default)
+    const usable = Math.max(10, tankH - off);
 
     let dist = (live.dist && live.dist > 0) ? live.dist : 49.7;
-    let pct = (live.pct !== undefined && live.pct > 0) ? live.pct : 77.2;
+    let pct = (live.pct !== undefined && live.pct >= 0) ? live.pct : 77.2;
 
-    if (dist <= 20.0 && dist > 0) {
+    if (dist <= off && dist > 0) {
       pct = 100.0;
     }
 
