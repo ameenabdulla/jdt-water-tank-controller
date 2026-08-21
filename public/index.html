@@ -11,6 +11,17 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="JDT Tank">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <script>
+    window.deferredPrompt = null;
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(function(){});
+    }
+    window.addEventListener('beforeinstallprompt', function(e) {
+      e.preventDefault();
+      window.deferredPrompt = e;
+      console.log('[PWA] Instant beforeinstallprompt captured!');
+    });
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -274,7 +285,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=15.0"></script>
+  <script src="app.js?v=16.0"></script>
   <script>if(window.lucide) lucide.createIcons();</script>
 </body>
 </html>

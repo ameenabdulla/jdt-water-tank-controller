@@ -138,19 +138,17 @@
   });
 
   function setupPwa() {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
-    }
-
     if ($.btnInstallPwa) {
       $.btnInstallPwa.addEventListener('click', async () => {
-        if (deferredPrompt) {
+        const promptEvent = window.deferredPrompt || deferredPrompt;
+        if (promptEvent) {
           try {
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            console.log('[PWA] Install prompt outcome:', outcome);
+            promptEvent.prompt();
+            const choice = await promptEvent.userChoice;
+            console.log('[PWA] User choice:', choice);
+            window.deferredPrompt = null;
             deferredPrompt = null;
-          } catch (_) {
+          } catch (e) {
             showPwaInstructions();
           }
         } else {
