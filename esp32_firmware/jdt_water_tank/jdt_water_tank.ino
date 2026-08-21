@@ -211,13 +211,16 @@ float toPercent(float dist) {
 }
 
 void checkResetButton() {
+  static unsigned long lowStartTime = 0;
+  static unsigned long highStartTime = 0;
+
   if (digitalRead(RESET_PIN) == LOW) {
-    if (!buttonHeld) {
-      buttonHeld = true;
-      buttonPressTime = millis();
-      Serial.println(F("Button on GPIO 4 held... Keep holding 5s to reset WiFi."));
-    } else if (millis() - buttonPressTime > 5000) {
-      Serial.println(F("Resetting WiFi preferences..."));
+    highStartTime = 0;
+    if (lowStartTime == 0) {
+      lowStartTime = millis();
+      Serial.println(F("Wire / Button detected on GPIO 4... Hold 2 seconds to reset WiFi."));
+    } else if (millis() - lowStartTime > 2000) {
+      Serial.println(F("Resetting WiFi preferences & restarting AP Hotspot..."));
       preferences.begin("cfg", false);
       preferences.clear();
       preferences.end();
@@ -231,7 +234,12 @@ void checkResetButton() {
       ESP.restart();
     }
   } else {
-    buttonHeld = false;
+    if (highStartTime == 0) {
+      highStartTime = millis();
+    } else if (millis() - highStartTime > 300) {
+      lowStartTime = 0;
+      highStartTime = 0;
+    }
   }
 }
 

@@ -142,18 +142,37 @@
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
+      if ($.btnInstallPwa) {
+        $.btnInstallPwa.style.display = 'inline-flex';
+      }
     });
 
     if ($.btnInstallPwa) {
       $.btnInstallPwa.addEventListener('click', async () => {
         if (deferredPrompt) {
-          deferredPrompt.prompt();
-          await deferredPrompt.userChoice;
-          deferredPrompt = null;
+          try {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+              console.log('[PWA] User accepted install prompt');
+            }
+            deferredPrompt = null;
+          } catch (_) {
+            showPwaInstructions();
+          }
         } else {
-          alert('📲 To Install JDT Tank App on your Phone:\n\n• Android (Chrome): Tap menu (⋮) -> "Add to Home screen" or "Install App"\n• iPhone (Safari): Tap Share button (↑) -> "Add to Home Screen"');
+          showPwaInstructions();
         }
       });
+    }
+  }
+
+  function showPwaInstructions() {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (isIOS) {
+      alert('📱 Install on iPhone / iPad (Safari):\n\n1. Tap the Share button ( ⎋ / ↥ ) at the bottom of Safari.\n2. Scroll down and tap "Add to Home Screen" ( ➕ ).\n3. Tap "Add" at the top right!');
+    } else {
+      alert('📱 Install on Android / Laptop (Chrome):\n\n1. Tap the 3 dots menu ( ⋮ ) at the top right of Chrome.\n2. Tap "Add to Home screen" or "Install app".\n3. Tap "Install" to create your standalone app icon!');
     }
   }
 
