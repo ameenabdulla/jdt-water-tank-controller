@@ -1,5 +1,5 @@
 /* JDT Water Tank Controller — PWA Service Worker */
-const CACHE_NAME = 'jdt-tank-v22';
+const CACHE_NAME = 'jdt-tank-v23';
 const ASSETS = [
   '/',
   '/index.html',
@@ -7,7 +7,8 @@ const ASSETS = [
   '/app.js',
   '/manifest.json',
   '/icon-192.png',
-  '/icon-512.png'
+  '/icon-512.png',
+  '/apple-touch-icon.png'
 ];
 
 self.addEventListener('install', (e) => {
@@ -27,7 +28,6 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  // Only handle GET requests for static assets, bypass API & WebSocket
   if (e.request.method !== 'GET' || e.request.url.includes('/ws') || e.request.url.includes('/api/')) return;
 
   e.respondWith(
