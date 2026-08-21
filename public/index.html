@@ -13,14 +13,23 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <script>
     window.deferredPrompt = null;
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(function(){});
-    }
     window.addEventListener('beforeinstallprompt', function(e) {
       e.preventDefault();
       window.deferredPrompt = e;
-      console.log('[PWA] Instant beforeinstallprompt captured!');
     });
+    if ('serviceWorker' in navigator) {
+      // Clear ALL old service workers and caches, then register fresh
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        var p = regs.map(function(r) { return r.unregister(); });
+        return Promise.all(p);
+      }).then(function() {
+        return caches.keys();
+      }).then(function(keys) {
+        return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+      }).then(function() {
+        navigator.serviceWorker.register('/sw.js');
+      }).catch(function(){});
+    }
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -313,7 +322,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=20.0"></script>
+  <script src="app.js?v=21.0"></script>
   <script>if(window.lucide) lucide.createIcons();</script>
 </body>
 </html>
