@@ -1,5 +1,5 @@
 /* JDT Water Tank Controller — PWA Service Worker */
-const CACHE_NAME = 'jdt-tank-v18';
+const CACHE_NAME = 'jdt-tank-v19';
 const ASSETS = [
   '/',
   '/index.html',

@@ -583,16 +583,19 @@
     const off = cfg.offset || 20; // Sensor offset (20cm default)
     const usable = Math.max(10, tankH - off);
 
-    let dist = (live.dist && live.dist > 0) ? live.dist : 49.7;
-    let pct = (live.pct !== undefined && live.pct >= 0) ? live.pct : 77.2;
+    let dist = (live.dist && live.dist > 0) ? live.dist : (off + 1);
+    let pct = (live.pct !== undefined && live.pct >= 0) ? live.pct : 0;
 
     if (dist <= off && dist > 0) {
       pct = 100.0;
     }
 
     pct = Math.min(100, Math.max(0, pct));
-    const depth = (pct / 100) * usable;
-    const dDisp = (dist <= 20.0) ? 20.0 : dist;
+
+    // Air gap = distance from top of tank (after offset). Starts from 0.
+    const airGap = Math.max(0, dist - off);
+    // Water depth = usable tank height minus air gap
+    const waterDepth = Math.max(0, usable - airGap);
 
     // Tank visual level & percentage
     $.water.style.height = pct.toFixed(1) + '%';
@@ -618,13 +621,15 @@
       }
     }
 
+    const isErr = live.err;
+
     // Hero
     $.lvlNum.textContent = pct.toFixed(1);
     $.lvlBar.style.width = pct.toFixed(1) + '%';
 
-    // Metrics
-    $.mDist.textContent = dDisp.toFixed(1);
-    $.mDepth.textContent = depth.toFixed(1);
+    // Metrics — air gap and water depth both start from 0 (offset subtracted)
+    $.mDist.textContent = airGap.toFixed(1);
+    $.mDepth.textContent = waterDepth.toFixed(1);
     $.mTank.textContent = tankH;
     $.mRssi.textContent = live.connected ? live.rssi : '--';
 
@@ -635,9 +640,9 @@
       $.rssiQ.textContent = 'Device Offline';
     }
 
-    // Live dist in modal
+    // Live dist in modal (show offset-adjusted distance)
     if ($.overlay.classList.contains('open')) {
-      $.sLive.textContent = isErr ? '-- cm' : dDisp.toFixed(1) + ' cm';
+      $.sLive.textContent = isErr ? '-- cm' : airGap.toFixed(1) + ' cm';
     }
 
     // Thresholds
