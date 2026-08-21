@@ -278,14 +278,42 @@
         <button type="button" class="btn-danger" id="btn-hard-reset"><i data-lucide="refresh-cw"></i> Hard Reset Device &amp; Start Hotspot</button>
 
       </div>
-      <div class="modal-foot">
-        <button class="btn-c" id="btn-cancel">Cancel</button>
-        <button class="btn-a" id="btn-apply"><i data-lucide="check"></i> Save &amp; Apply</button>
+      <div class="modal-ftr">
+        <button class="btn-sec" id="btn-cancel">Cancel</button>
+        <button class="btn-pri" id="btn-apply"><i data-lucide="check"></i> Save &amp; Apply</button>
       </div>
     </div>
   </div>
 
-  <script src="app.js?v=16.0"></script>
+  <!-- ═══════ PWA INSTALL MODAL ═══════ -->
+  <div class="overlay" id="pwa-overlay">
+    <div class="modal">
+      <div class="modal-hdr">
+        <div class="modal-title"><i data-lucide="download"></i> Install JDT Tank App</div>
+        <button class="modal-x" id="pwa-modal-x">&times;</button>
+      </div>
+      <div class="modal-body" style="text-align:center;">
+        <p style="margin-top:0; color:#94a3b8; font-size:0.9rem;">
+          Install JDT Water Tank Controller as a standalone app on your Laptop or Phone for instant access!
+        </p>
+        <div style="background:rgba(14,165,233,0.12); border:1px solid rgba(14,165,233,0.3); border-radius:12px; padding:16px; margin:16px 0; text-align:left;">
+          <div style="font-weight:700; color:#38bdf8; margin-bottom:6px; font-size:0.95rem;">💻 On Laptop (Chrome / Edge):</div>
+          <div style="color:#e2e8f0; font-size:0.85rem; line-height:1.5;">
+            Look at the top right of your browser address bar &mdash; click the <b>"Open in app"</b> button or <b>Install Icon (⬇️)</b>!
+          </div>
+        </div>
+        <div style="background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.3); border-radius:12px; padding:16px; margin:16px 0; text-align:left;">
+          <div style="font-weight:700; color:#818cf8; margin-bottom:6px; font-size:0.95rem;">📱 On Smartphone (Android / iPhone):</div>
+          <div style="color:#e2e8f0; font-size:0.85rem; line-height:1.5;">
+            Tap Chrome menu (<b>⋮</b>) or Safari Share button (<b>⎋</b>) &rarr; tap <b>"Add to Home Screen"</b> or <b>"Install App"</b>.
+          </div>
+        </div>
+        <button type="button" class="btn-pri full" id="pwa-modal-close" style="margin-top:10px; width:100%; justify-content:center;">Got It!</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=17.0"></script>
   <script>if(window.lucide) lucide.createIcons();</script>
 </body>
 </html>

@@ -138,6 +138,17 @@
   });
 
   function setupPwa() {
+    const pwaOverlay = document.getElementById('pwa-overlay');
+    const pwaX = document.getElementById('pwa-modal-x');
+    const pwaClose = document.getElementById('pwa-modal-close');
+
+    function openPwaModal() { if (pwaOverlay) pwaOverlay.classList.add('open'); }
+    function closePwaModal() { if (pwaOverlay) pwaOverlay.classList.remove('open'); }
+
+    if (pwaX) pwaX.addEventListener('click', closePwaModal);
+    if (pwaClose) pwaClose.addEventListener('click', closePwaModal);
+    if (pwaOverlay) pwaOverlay.addEventListener('click', (e) => { if (e.target === pwaOverlay) closePwaModal(); });
+
     if ($.btnInstallPwa) {
       $.btnInstallPwa.addEventListener('click', async () => {
         const promptEvent = window.deferredPrompt || deferredPrompt;
@@ -149,21 +160,12 @@
             window.deferredPrompt = null;
             deferredPrompt = null;
           } catch (e) {
-            showPwaInstructions();
+            openPwaModal();
           }
         } else {
-          showPwaInstructions();
+          openPwaModal();
         }
       });
-    }
-  }
-
-  function showPwaInstructions() {
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    if (isIOS) {
-      alert('📱 Install on iPhone / iPad (Safari):\n\n1. Tap the Share button ( ⎋ / ↥ ) at the bottom of Safari.\n2. Scroll down and tap "Add to Home Screen" ( ➕ ).\n3. Tap "Add" at the top right!');
-    } else {
-      alert('⚡ Install JDT Tank App:\n\n• Look at the top right of your Chrome address bar — click the "Open in app" or Install icon (⬇️)!\n\nOR:\n• Tap Chrome menu (⋮) -> "Install JDT Water Tank Controller" or "Add to Home screen".');
     }
   }
 
