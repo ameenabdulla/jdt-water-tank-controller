@@ -138,64 +138,44 @@
   });
 
   function setupPwa() {
-    const pwaOverlay = document.getElementById('pwa-overlay');
-    const pwaX = document.getElementById('pwa-modal-x');
-    const pwaClose = document.getElementById('pwa-modal-close');
-
-    function openPwaModal() { if (pwaOverlay) pwaOverlay.classList.add('open'); }
-    function closePwaModal() { if (pwaOverlay) pwaOverlay.classList.remove('open'); }
-
-    if (pwaX) pwaX.addEventListener('click', closePwaModal);
-    if (pwaClose) pwaClose.addEventListener('click', closePwaModal);
-    if (pwaOverlay) pwaOverlay.addEventListener('click', (e) => { if (e.target === pwaOverlay) closePwaModal(); });
-
-    async function tryInstall() {
-      const promptEvent = window.deferredPrompt || deferredPrompt;
-      if (promptEvent) {
-        try {
-          promptEvent.prompt();
-          const choice = await promptEvent.userChoice;
-          window.deferredPrompt = null;
-          deferredPrompt = null;
-          return true;
-        } catch (_) {}
-      }
-      return false;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isStandalone && $.btnInstallPwa) {
+      $.btnInstallPwa.style.display = 'none';
+      return;
     }
+
+    window.addEventListener('appinstalled', () => {
+      console.log('[PWA] App successfully installed!');
+      if ($.btnInstallPwa) $.btnInstallPwa.style.display = 'none';
+      window.deferredPrompt = null;
+      deferredPrompt = null;
+    });
 
     if ($.btnInstallPwa) {
       $.btnInstallPwa.addEventListener('click', async () => {
-        // Try immediately first
-        if (await tryInstall()) return;
-
-        // If not ready, wait up to 5 seconds for Chrome to fire beforeinstallprompt
-        $.btnInstallPwa.textContent = '⏳ Preparing...';
-        $.btnInstallPwa.disabled = true;
-
-        let resolved = false;
-        const waitPromise = new Promise((resolve) => {
-          // Listen for the event to fire during the wait
-          const handler = () => { resolved = true; resolve(); };
-          window.addEventListener('beforeinstallprompt', function once(e) {
-            e.preventDefault();
-            window.deferredPrompt = e;
-            deferredPrompt = e;
-            window.removeEventListener('beforeinstallprompt', once);
-            handler();
-          });
-          // Timeout after 5 seconds
-          setTimeout(() => { if (!resolved) resolve(); }, 5000);
-        });
-
-        await waitPromise;
-
-        $.btnInstallPwa.innerHTML = '<i data-lucide="download"></i> Install App';
-        $.btnInstallPwa.disabled = false;
-        if (window.lucide) lucide.createIcons();
-
-        // Try again after waiting
-        if (!(await tryInstall())) {
-          openPwaModal();
+        const promptEvent = window.deferredPrompt || deferredPrompt;
+        if (promptEvent) {
+          try {
+            promptEvent.prompt();
+            const choice = await promptEvent.userChoice;
+            console.log('[PWA] User choice:', choice);
+            window.deferredPrompt = null;
+            deferredPrompt = null;
+            if (choice.outcome === 'accepted') {
+              if ($.btnInstallPwa) $.btnInstallPwa.style.display = 'none';
+            }
+          } catch (e) {
+            console.error('[PWA] Prompt error:', e);
+          }
+        } else {
+          // If browser has native install icon in address bar or menu
+          $.btnInstallPwa.textContent = '📥 Check Browser Menu / URL Bar';
+          setTimeout(() => {
+            if ($.btnInstallPwa) {
+              $.btnInstallPwa.innerHTML = '<i data-lucide="download"></i> Install App';
+              if (window.lucide) lucide.createIcons();
+            }
+          }, 3000);
         }
       });
     }

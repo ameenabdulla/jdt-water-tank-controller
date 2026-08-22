@@ -1,5 +1,5 @@
 /* JDT Water Tank Controller — PWA Service Worker */
-const CACHE_NAME = 'jdt-tank-v23';
+const CACHE_NAME = 'jdt-tank-v24';
 const ASSETS = [
   '/',
   '/index.html',
@@ -33,10 +33,19 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(
     fetch(e.request)
       .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(e.request, copy));
+        if (res && res.status === 200) {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, copy));
+        }
         return res;
       })
-      .catch(() => caches.match(e.request))
+      .catch(async () => {
+        const cached = await caches.match(e.request);
+        if (cached) return cached;
+        if (e.request.mode === 'navigate' || e.request.destination === 'document') {
+          return (await caches.match('/index.html')) || (await caches.match('/'));
+        }
+        return new Response('Offline', { status: 503, statusText: 'Offline' });
+      })
   );
 });
