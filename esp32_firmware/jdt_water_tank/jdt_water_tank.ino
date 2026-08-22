@@ -439,8 +439,8 @@ void loop() {
     disconnectStartTime = 0;
   }
   
-  // Send telemetry every 500ms for smooth live updates
-  if (millis() - lastTelemetryTime > 500) {
+  // Send telemetry every 120ms for ultra-fast instant live updates with zero lag
+  if (millis() - lastTelemetryTime > 120) {
     lastTelemetryTime = millis();
     
     float newDist = measureDistance();
@@ -462,14 +462,17 @@ void loop() {
       sensorError = false;
       lastValidDistance = newDist;
 
-      if (smoothedDistance == 0.0) {
+      // ZERO-LAG ADAPTIVE FILTER:
+      // If water level or target moves by > 1.0cm, snap immediately without delay!
+      // If steady, apply light smoothing to prevent electrical noise jitter.
+      if (smoothedDistance == 0.0 || abs(newDist - smoothedDistance) > 1.0) {
         smoothedDistance = newDist;
       } else {
-        smoothedDistance = (smoothedDistance * 0.7) + (newDist * 0.3);
+        smoothedDistance = (smoothedDistance * 0.6) + (newDist * 0.4);
       }
     } else {
       failedReadings++;
-      if (failedReadings >= 15) {
+      if (failedReadings >= 10) {
         sensorError = true;
       }
     }
